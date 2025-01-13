@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RingQ Dialer</title>
+
+  <script src="https://ringq-dev-ed.develop.lightning.force.com/support/api/62.0/lightning/opencti_min.js" type="application/javascript"></script>
+
+  <script type="text/javascript">
+    function checkSoftphonePanelVisibility() {
+      return new Promise((resolve, reject) => {
+        sforce.opencti.isSoftphonePanelVisible({
+          callback: function(response) {
+            if (response.success) {
+              resolve(response.returnValue);
+            } else {
+              reject('Failed to check softphone panel visibility');
+            }
+          }
+        });
+      });
+    }
+
+    function invokeDialer(direction, phoneNumber) {
+      let _direction = null;
+      if (direction == 'inbound') _direction = sforce.opencti.CALL_TYPE.INBOUND;
+      if (direction == 'outbound') _direction = sforce.opencti.CALL_TYPE.OUTBOUND;
+      if (direction == 'internal') _direction = sforce.opencti.CALL_TYPE.INTERNAL;
+
+      sforce.opencti.searchAndScreenPop({
+        searchParams: phoneNumber,
+        callType: _direction,
+        deferred: false,
+        callback: callback
+      }); 
+    }
+
+    function toggleSoftphonePanel(visible) {
+      sforce.opencti.setSoftphonePanelVisibility({
+        visible: visible,
+        callback: function(response) {
+          if (response.success) {
+            console.log('Softphone panel visibility set to', visible);
+          } else {
+            console.error('Failed to set Softphone panel visibility:', response.errors);
+          }
+        }
+      });
+    }
+
+    function navigateToRecord(recordId) {
+      const baseUrl = '/lightning/r/';
+      const recordUrl = `${baseUrl}${recordId}/view`;
+
+      sforce.opencti.navigateToUrl({
+        url: recordUrl,
+        callback: function(response) {
+          if (response.success) {
+            console.log('Navigation successful to record:', recordId);
+          } else {
+            console.error('Failed to navigate to record:', response.errors);
+          }
+        }
+      });
+    }
+
+    function openFloatingWindow(url) {
+      const screenWidth = window.screen.width;
+      const screenHeight = window.screen.height;
+      const windowWidth = screenWidth / 2;
+      const windowHeight = screenHeight / 2;
+      const left = screenWidth - windowWidth; 
+      const top = 0; 
+
+      window.open(
+        url,
+        'FloatingWindow',
+        `width=${windowWidth},height=${windowHeight},top=${top},left=${left},resizable=yes,scrollbars=yes`
+      );
+ 
+      // window.location.href = url;
+    } 
+
+    var callback = function(response) {
+      if (response.success) {
+        checkSoftphonePanelVisibility()
+          .then(isVisible => {
+            if (isVisible) toggleSoftphonePanel(true);
+          })
+          .catch(error => {
+            console.error("Error checking visibility callback:", error);
+          });
+ 
+          // Object.keys(response.returnValue).forEach(key => {
+          //   console.log(`Key: ${key}, Value: ${response.returnValue[key].Phone}`);
+          //   if (response.returnValue[key].Phone) {
+          //     invokeDialer('outbound', response.returnValue[key].Phone);
+          //   }
+          // }); 
+      } else {
+        console.error('Something went wrong! Errors:', response.errors);
+      }
+    };
+ 
+    var listener = function(payload) {
+      const phoneNumber = payload.number;
+       
+      const url = new URL(window.location.href);
+      url.searchParams.set('call', phoneNumber);
+ 
+      checkSoftphonePanelVisibility()
+        .then(isVisible => {
+          window.location.replace(url);
+          const callNumber = url.searchParams.get('call');
+          invokeDialer('outbound', callNumber); 
+        })
+        .catch(error => {
+          console.error("Error checking visibility:", error);
+        });
+    };
+ 
+    sforce.opencti.getAppViewInfo({ callback: callback });
+    sforce.opencti.enableClickToDial({ callback: callback });
+    sforce.opencti.onClickToDial({ listener: listener });
+  </script>
+</head>
+<body>
+  <script src="main.dart.js" type="application/javascript"></script>
+</body>
+</html>
