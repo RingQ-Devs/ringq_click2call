@@ -1323,3 +1323,19 @@ class _BlinkingWidgetState extends State<BlinkingWidget> with SingleTickerProvid
 IconButton infoButton(String content) {
   return IconButton(onPressed: null, icon: Icon(Boxicons.bxs_info_circle, color: primaryColor2, size: headerSize), tooltip: content);
 } 
+
+displayLogo(context) {
+  return Row( 
+    children: [
+      const SizedBox(width: 10,),
+      GestureDetector(
+        onTap: () {
+          // print(callInbound);
+        },
+        child: Image.asset('images/logo4.png', width: 120),
+      ),
+      const Spacer(),
+      const SizedBox(width: 10,), 
+    ],
+  );
+}

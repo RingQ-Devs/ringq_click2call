@@ -13,6 +13,7 @@ import 'package:carbon_icons/carbon_icons.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class InitiationPage extends StatefulWidget {
   final SIPUAHelper helper;
@@ -45,12 +46,18 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
   final StopWatchTimer _stopWatchTimer = StopWatchTimer();
   bool get voiceOnly => (_localStream == null || _localStream!.getVideoTracks().isEmpty) && (_remoteStream == null || _remoteStream!.getVideoTracks().isEmpty);
   final TextEditingController _searchController = TextEditingController();
+  final AudioPlayer _player = AudioPlayer();
 
   @override
   initState() {
     super.initState();
     _initRenderers();
     helper!.addSipUaHelperListener(this);
+
+    _player.play(
+      UrlSource('https://demo.us1.ringq.ai:8443/audio/ringtone2.mp3'), 
+      mode: PlayerMode.lowLatency,
+    );
   }
 
   void _initRenderers() async {
@@ -72,12 +79,7 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
     _holdCall
       ? callInbound!.unhold()
       : callInbound!.hold();
-  }
-
-  void _performDtmf(String tone) {
-    callInbound!.sendDTMF(tone, {"interToneGap": 200});
-    playBeepSound();
-  }
+  } 
 
   void _performRecord() async {
     setState(() => _recordCall = !_recordCall);
@@ -94,7 +96,6 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
       prettyLog(content["content"]);
       if (content["result"] == "success" && content["registered"] == "false") { 
         openFloatingWindow(content["content"]);
-        // launchUrl(Uri.parse(content["content"]));
       }
     } catch (e) {
       setState(() {
@@ -116,7 +117,8 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
       _registerCallGet(extensionNo, callInbound!.remote_identity!, callInbound!.remote_display_name!); 
 
       callInbound?.answer(helper!.buildCallOptions(!false), mediaStream: mediaStream);
-    }
+    } 
+    _player.stop();
   }
 
   void _performHangup() {
@@ -160,125 +162,105 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
       });
     }
     Timer(const Duration(milliseconds: 100), () {
+      _player.stop();
       callInbound = null;
       Navigator.of(context).pop();
     });
   }
 
-  void _performSearch(String searchTerm) async {
-    if (double.tryParse(searchTerm) != null) {
-      _searchLogs = _extensionData.where((item) => item["extension"].toString().toLowerCase().contains(searchTerm)).toList();
-      if (_searchLogs.isNotEmpty) {
-        setState(() {
-          _loading = false;
-        });
-      } else {
-        setState(() {
-          _loading = false;
-        });
-      }
-    } else {
-      _searchLogs = _extensionData.where((item) => (item["firstname"] + item["lastname"]).toString().toLowerCase().contains(searchTerm)).toList();
-      if (_searchLogs.isNotEmpty) {
-        setState(() {
-          _loading = false;
-        });
-      } else {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
+  displayName(displayName) {
+    return Text(
+      displayName,
+      style: TextStyle(color: whiteColor, fontFamily: "primaryFont", fontSize: headerSize * 1.35, fontWeight: FontWeight.w300),
+      textAlign: TextAlign.center,
+      maxLines: 2,
+    );
   }
 
-  Expanded dialNumber(String number) {
-    return Expanded(
-      child: Container(
-        padding: EdgeInsets.only(bottom: width * 0.01),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            elevation: 0.0,
-            shape: const CircleBorder(),
-          ),
-          onPressed: () {
-            setState(() {
-              _dmtf += number;
-              _performDtmf(number);
-            });
-          },
-          child: Container(
-            padding: EdgeInsets.all(subParagraphSize),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  number,
-                  style: TextStyle(
-                    fontSize: headerSize * 1.5,
-                    color: whiteColor,
-                    fontWeight: FontWeight.w400,
-                    fontFamily: "primaryFont",
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                Text(
-                  getDialSubContent(number),
-                  style: TextStyle(
-                    fontSize: subParagraphSize,
-                    color: whiteColor,
-                    fontWeight: FontWeight.w300,
-                    fontFamily: "primaryFont",
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
+  displayRemoteIdentity(remoteIdentity) {
+    return Text(
+      remoteIdentity,
+      style: TextStyle(color: whiteColor, fontFamily: "primaryFont", fontSize: headerSize * 1.35, fontWeight: FontWeight.w300),
+      textAlign: TextAlign.center,
+      maxLines: 2,
+    ); 
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: backgroundColor,
-      body: Column(
-        children: <Widget>[ 
-          const SizedBox(height: 20),
-          ClipOval(
-            child: Image.asset(
-              'images/logo5.png',
-              width: 100,
-              height: 100, 
-              fit: BoxFit.cover,
-            ),
-          ), 
-          const SizedBox(height: 10),
-          Text(
-            callInbound!.remote_display_name!,
-            style: TextStyle(color: whiteColor, fontFamily: "primaryFont", fontSize: headerSize * 1.35, fontWeight: FontWeight.w300),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-          ),
-          const SizedBox(height: 5),
-          Text(
-            callInbound!.remote_identity!,
-            style: TextStyle(color: whiteColor, fontFamily: "primaryFont", fontSize: headerSize * 1.35, fontWeight: FontWeight.w300),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-          ),
-          _answered == false && _direction == Direction.incoming.name.toUpperCase()
-            ? Container()
-            : _dialpad
-              ? Container()
-              : const Spacer(),
-          _answered == false && _direction == Direction.incoming.name.toUpperCase()
-            ? Container()
-            : _dialpad
-              ? Container()
-              : StreamBuilder<int>(
+      body: Container( 
+        child: _answered == false && _direction == Direction.incoming.name.toUpperCase()
+          ? Column(
+              children: [
+                const SizedBox(height: 10,), 
+                const Spacer(), 
+                displayName(callInbound!.remote_display_name!),
+                displayRemoteIdentity(callInbound!.remote_identity!),
+                const SizedBox(height: 50,),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center, 
+                  children: [
+                    Transform.rotate(
+                      angle: _direction == Direction.incoming.name.toUpperCase() 
+                        ? 0 
+                        : 40.05,
+                      child: AvatarGlow(
+                        glowColor: _direction == Direction.incoming.name.toUpperCase() 
+                          ? primaryColor2 
+                          : redColor,
+                        child: CircleAvatar(
+                          backgroundColor: _direction == Direction.incoming.name.toUpperCase() 
+                            ? primaryColor2 
+                            : redColor,
+                          radius: headerSize * 1.8,
+                          child: IconButton(
+                            onPressed: _performAccept,
+                            iconSize: headerSize * 1.8,
+                            color: primaryColor2,
+                            icon: Icon(
+                              CarbonIcons.phone_filled,
+                              size: headerSize * 1.8,
+                              color: whiteColor,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 50,),
+                    Transform.rotate(
+                      angle: 40.05,
+                      child: CircleAvatar(
+                        backgroundColor: redColor,
+                        radius: headerSize * 1.8,
+                        child: IconButton(
+                          onPressed: _performHangup,
+                          iconSize: headerSize * 1.8,
+                          color: redColor,
+                          icon: Icon(
+                            CarbonIcons.phone_block_filled,
+                            size: headerSize * 1.8,
+                            color: whiteColor,
+                          ),
+                        ),
+                      ),
+                    )
+                  ],
+                ),
+                const Spacer()
+              ],
+            )
+          : Column(
+              children: [
+                const SizedBox(height: 10),
+                displayLogo(context),
+                const Spacer(), 
+                const SizedBox(height: 10,),
+                displayName(destinationName),
+                displayRemoteIdentity(callInbound!.remote_identity!),
+                const SizedBox(height: 20),
+                StreamBuilder<int>(
                   stream: _stopWatchTimer.rawTime,
                   initialData: _stopWatchTimer.rawTime.value,
                   builder: (context, snapshot) {
@@ -288,289 +270,108 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
                       hours: elapsedMilliseconds >= 3600000,
                       milliSecond: false,
                     );
-                    return Text(displayTime, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),);
+                    return Text(
+                      displayTime,
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.normal, color: Colors.grey.shade200),
+                    );
                   },
                 ),
-          _answered == false && _direction == Direction.incoming.name.toUpperCase()
-            ? Container()
-            : _dialpad
-              ? Container()
-              : const Spacer(),
-          _answered == false && _direction == Direction.incoming.name.toUpperCase()
-            ? Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center, 
+                const Spacer(),
+                Row( 
                   children: [
                     Expanded(
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center, 
+                      child: Column(
                         children: [
-                          _declined
-                            ? Container()
-                            : Transform.rotate(
-                              angle: _direction == Direction.incoming.name.toUpperCase() ? 0 : 40.05,
-                              child: AvatarGlow(
-                                glowColor: _direction == Direction.incoming.name.toUpperCase() ? primaryColor2 : redColor,
-                                child: CircleAvatar(
-                                  backgroundColor: _direction == Direction.incoming.name.toUpperCase() ? primaryColor2 : redColor,
-                                  radius: headerSize * 1.8,
-                                  child: IconButton(
-                                    onPressed: _performAccept,
-                                    iconSize: headerSize * 1.8,
-                                    color: primaryColor2,
-                                    icon: Icon(
-                                      CarbonIcons.phone_filled,
-                                      size: headerSize * 1.8,
-                                      color: whiteColor,
-                                    ),
-                                  ),
+                          IconButton(
+                            onPressed: () {
+                              if (_callState == CallStateEnum.CONFIRMED && _parkedCall == false) {
+                                _performHold(); 
+                              }
+                            },
+                            iconSize: headerSize * 2,
+                            icon: _parkedCall
+                              ? Icon(LucideIcons.pause, size: headerSize * 1.6, color: primaryColor2)
+                              : Icon(
+                                  LucideIcons.pause, size: headerSize * 1.6, 
+                                  color: _holdCall 
+                                    ? primaryColor2 
+                                    : whiteColor
                                 ),
-                              ),
-                            ),
-                          const SizedBox(width: 50,),
-                          _direction == Direction.incoming.name.toUpperCase()
-                            ? Transform.rotate(
-                                angle: 40.05,
-                                child: CircleAvatar(
-                                  backgroundColor: redColor,
-                                  radius: headerSize * 1.8,
-                                  child: IconButton(
-                                    onPressed: _performHangup,
-                                    iconSize: headerSize * 1.8,
-                                    color: redColor,
-                                    icon: Icon(
-                                      CarbonIcons.phone_block_filled,
-                                      size: headerSize * 1.8,
-                                      color: whiteColor,
-                                    ),
-                                  ),
+                          ),
+                          const SizedBox(height: 10, ),
+                          Text(
+                            "Hold",
+                            style: _parkedCall
+                              ? TextStyle(color: primaryColor2, fontSize: paragraphSize, fontWeight: FontWeight.w300)
+                              : TextStyle(
+                                  color: _holdCall 
+                                    ? primaryColor2 
+                                    : whiteColor, 
+                                  fontSize: paragraphSize, 
+                                  fontWeight: FontWeight.w300
                                 ),
-                              )
-                            : Container(),
-                        ],
-                      ),
-                    ), 
-                  ],
-                ),
-              )
-            : _dialpad
-                ? Column(
-                    children: [
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: <Widget>[
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            children: <Widget>[
-                              dialNumber("1"),
-                              dialNumber("2"),
-                              dialNumber("3"),
-                            ],
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            children: <Widget>[
-                              dialNumber("4"),
-                              dialNumber("5"),
-                              dialNumber("6"),
-                            ],
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            children: <Widget>[
-                              dialNumber("7"),
-                              dialNumber("8"),
-                              dialNumber("9"),
-                            ],
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            children: <Widget>[
-                              dialNumber("*"),
-                              dialNumber("0"),
-                              dialNumber("#"),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              const Spacer(),
-                              Expanded(
-                                child: IconButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _dialpad = _dialpad ? false : true;
-                                    });
-                                  },
-                                  iconSize: headerSize * 1.8,
-                                  icon: Icon(
-                                    CarbonIcons.arrow_left,
-                                    size: headerSize * 1.8,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              const Spacer(),
-                            ],
                           ),
                         ],
                       ),
-                      const Spacer(),
-                    ],
-                  )
-                : Column(
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            children: [
-                              IconButton(
-                                onPressed: () {
-                                  if (_callState == CallStateEnum.CONFIRMED) {
-                                    if (_parkedCall == false) {
-                                      _performHold();
-                                    }
-                                  }
-                                },
-                                iconSize: headerSize * 2,
-                                icon: _parkedCall
-                                    ? Icon(LucideIcons.pause, size: headerSize * 2, color: primaryColor2)
-                                    : Icon(LucideIcons.pause, size: headerSize * 2, color: _holdCall ? primaryColor2 : whiteColor),
-                              ),
-                              const SizedBox(
-                                height: 10,
-                              ),
-                              Text(
-                                "Hold",
-                                style: _parkedCall
-                                  ? TextStyle(color: primaryColor2, fontSize: paragraphSize, fontWeight: FontWeight.w300)
-                                  : TextStyle(color: _holdCall ? primaryColor2 : whiteColor, fontSize: paragraphSize, fontWeight: FontWeight.w300),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Column(
-                            children: [
-                              IconButton(
-                                onPressed: () { 
-                                  if (!_holdCall) { 
-                                    _performMute();
-                                  }
-                                },
-                                iconSize: headerSize * 2,
-                                icon: Icon(_muteCall ? LucideIcons.micOff : LucideIcons.mic, size: headerSize * 2, color: _muteCall ? primaryColor2 : whiteColor),
-                              ),
-                              const SizedBox(
-                                height: 10,
-                              ),
-                              Text(
-                                "Mute",
-                                style: TextStyle(color: _recordCall ? primaryColor2 : whiteColor, fontSize: paragraphSize, fontWeight: FontWeight.w300),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
                     ),
-                    // Row(
-                    //   children: [
-                        // Expanded(
-                        //   child: Column(
-                        //     children: [
-                        //       IconButton(
-                        //         onPressed: () {
-                        //           if (_callState == CallStateEnum.CONFIRMED) {
-                        //             if (!_parkedCall) {
-                        //               setState(() {
-                        //                 _loading = true;
-                        //                 _transferring = _transferring ? false : true;
-                        //               });
-                        //             }
-                        //           }
-                        //         },
-                        //         iconSize: headerSize * 2,
-                        //         icon: Icon(LucideIcons.repeat2, size: headerSize * 2, color: whiteColor),
-                        //       ),
-                        //       const SizedBox(
-                        //         height: 10,
-                        //       ),
-                        //       Text(
-                        //         "Transfer",
-                        //         style: TextStyle(color: whiteColor, fontSize: paragraphSize, fontWeight: FontWeight.w300),
-                        //         textAlign: TextAlign.center,
-                        //       ),
-                        //     ],
-                        //   ),
-                        // ),
-                        // Expanded(
-                        //   child: Column(
-                        //     children: [
-                        //       CircleAvatar(
-                        //         backgroundColor: backgroundColor,
-                        //         radius: headerSize * 1.8,
-                        //         child: IconButton(
-                        //           onPressed: () {
-                        //             callInbound!.refer("3000");
-                        //           },
-                        //           iconSize: headerSize * 1.8,
-                        //           color: redColor,
-                        //           icon: Icon(
-                        //             CarbonIcons.star,
-                        //             size: headerSize * 1.8,
-                        //             color: whiteColor,
-                        //           ),
-                        //         ),
-                        //       ),
-                        //       const SizedBox(
-                        //         height: 10,
-                        //       ),
-                        //       Text(
-                        //         "Survey",
-                        //         style: TextStyle(color: whiteColor, fontSize: paragraphSize, fontWeight: FontWeight.w300),
-                        //         textAlign: TextAlign.center,
-                        //       ),
-                        //     ],
-                        //   ),
-                        // ),
-                    //   ],
-                    // ),
-                    const SizedBox(height: 50,),
-                    Container( 
-                      color: Colors.white10,
-                      child: Row(
+                    Expanded(
+                      child: Column(
                         children: [
-                          // Expanded(
-                          //   child: GestureDetector(
-                          //     onTap: () {
-                          //       if (_callState == CallStateEnum.CONFIRMED) {
-                          //         setState(() {
-                          //           _dialpad = _dialpad ? false : true;
-                          //         });
-                          //       }
-                          //     },
-                          //     child: Icon(Boxicons.bx_dialpad, size: headerSize * 1, color: whiteColor, opticalSize: headerSize * 2),
-                          //   ),
-                          // ),
-                          Expanded(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              color: redColor,
-                              child: InkWell(
-                                onTap: () {
-                                  _performHangup();
-                                },
-                                child: Icon(CarbonIcons.phone_filled, size: headerSize * 2, color: whiteColor, opticalSize: headerSize * 2),
-                              ),
+                          IconButton(
+                            onPressed: () { 
+                              if (!_holdCall) { 
+                                _performMute();
+                              }
+                            },
+                            iconSize: headerSize * 2,
+                            icon: Icon(
+                              _muteCall 
+                                ? LucideIcons.micOff 
+                                : LucideIcons.mic, 
+                              size: headerSize * 1.6, 
+                              color: _muteCall 
+                                ? primaryColor2 
+                                : whiteColor
+                            ),
+                          ),
+                          const SizedBox(height: 10, ),
+                          Text(
+                            "Mute",
+                            style: TextStyle(
+                              color: _muteCall 
+                                ? primaryColor2 
+                                : whiteColor, 
+                              fontSize: paragraphSize, 
+                              fontWeight: FontWeight.w300
                             ),
                           ),
                         ],
                       ),
-                    )
+                    ),
                   ],
                 ),
-        ],
+                const SizedBox(height: 20,),
+                Container( 
+                  color: Colors.white10,
+                  child: Row(
+                    children: [ 
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          color: redColor,
+                          child: InkWell(
+                            onTap: () {
+                              _performHangup();
+                            },
+                            child: Icon(CarbonIcons.phone_filled, size: headerSize * 2, color: whiteColor, opticalSize: headerSize * 2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              ],
+            ),
       ),
     );
   }
@@ -623,6 +424,7 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
         break;
       case CallStateEnum.ACCEPTED:
         if (_direction == "OUTGOING") {
+          _player.stop();
           setState(() {
             _stopWatchTimer.onStartTimer();
             _loading = false;
