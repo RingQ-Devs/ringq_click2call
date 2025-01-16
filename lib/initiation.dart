@@ -419,7 +419,7 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
           setState(() {
             _stopWatchTimer.onStartTimer();
             _loading = false;
-          });
+          }); 
         }
         break;
       case CallStateEnum.ACCEPTED:
@@ -429,6 +429,7 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
             _stopWatchTimer.onStartTimer();
             _loading = false;
           });
+          _registerCallGet(extensionNo, callInbound!.remote_identity!, callInbound!.remote_display_name!); 
         }
         break;
       case CallStateEnum.CONFIRMED:
