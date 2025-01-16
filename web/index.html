@@ -33,7 +33,7 @@
         deferred: false,
         callback: callback
       }); 
-    }
+    } 
 
     function toggleSoftphonePanel(visible) {
       sforce.opencti.setSoftphonePanelVisibility({
@@ -69,19 +69,16 @@
       const screenHeight = window.screen.height;
       const windowWidth = screenWidth / 2;
       const windowHeight = screenHeight / 2;
-      const left = screenWidth - windowWidth; 
-      const top = 0; 
+
+      const left = (screenWidth - windowWidth) / 2;
+      const top = (screenHeight - windowHeight) / 2;
 
       window.open(
         url,
         'FloatingWindow',
         `width=${windowWidth},height=${windowHeight},top=${top},left=${left},resizable=yes,scrollbars=yes`
       );
-
-      console.log('opened form for new contact');
- 
-      // window.location.href = url;
-    } 
+    }
 
     var callback = function(response) {
       if (response.success) {
@@ -114,7 +111,7 @@
         .then(isVisible => {
           window.location.replace(url);
           const callNumber = url.searchParams.get('call');
-          invokeDialer('outbound', callNumber); 
+          invokeDialer('outbound', callNumber);
         })
         .catch(error => {
           console.error("Error checking visibility:", error);

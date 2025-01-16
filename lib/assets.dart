@@ -19,7 +19,9 @@ import 'package:js/js.dart';
 @JS()external void toggleSoftphonePanel(bool hidden);
 @JS()external void openFloatingWindow(String url);
 
-Call? callInbound;
+Call? callDirections;
+bool inProgress = false;
+bool dialerStatus = false;
 bool debug = false;
 bool initial = true;
 bool dialOpen = true;
@@ -78,7 +80,7 @@ void playBeepSound() async {
   await beepPlayer.setVolume(0.03);
   await beepPlayer.play();
 }
-
+ 
 String destination = "";
 String destinationName = "";
 String supervisorCall = "";

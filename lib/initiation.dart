@@ -32,11 +32,9 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
   bool _muteCall = false;
   bool _recordCall = false;
   bool _parkedCall = false;
-  bool _transferring = false;
-  List _searchLogs = [];
-  List _extensionData = [];
-  String _dmtf = "";
-  String get _direction => callInbound!.direction;
+  bool _transferring = false; 
+  List _extensionData = []; 
+  String get _direction => callDirections!.direction;
   CallStateEnum _callState = CallStateEnum.NONE;
   SIPUAHelper? get helper => widget.helper;
   MediaStream? _localStream;
@@ -71,18 +69,14 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
 
   void _performMute() { 
     _muteCall
-      ? callInbound!.unmute(true, false)
-      : callInbound!.mute(true, false);
+      ? callDirections!.unmute(true, false)
+      : callDirections!.mute(true, false);
   }
 
   void _performHold() async {
     _holdCall
-      ? callInbound!.unhold()
-      : callInbound!.hold();
-  } 
-
-  void _performRecord() async {
-    setState(() => _recordCall = !_recordCall);
+      ? callDirections!.unhold()
+      : callDirections!.hold();
   }
 
   void _registerCallGet(String extension, String number, String queueNumber ) async {
@@ -110,13 +104,13 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
     MediaStream mediaStream;
     final mediaConstraints = <String, dynamic>{'audio': true, 'video': false};
     mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-    if (callInbound != null) {
+    if (callDirections != null) {
       _answered = true;
       _stopWatchTimer.onStartTimer;
-      invokeDialer('inbound', callInbound!.remote_identity!);
-      _registerCallGet(extensionNo, callInbound!.remote_identity!, callInbound!.remote_display_name!); 
+      invokeDialer('inbound', callDirections!.remote_identity!);
+      _registerCallGet(extensionNo, callDirections!.remote_identity!, callDirections!.remote_display_name!); 
 
-      callInbound?.answer(helper!.buildCallOptions(!false), mediaStream: mediaStream);
+      callDirections?.answer(helper!.buildCallOptions(!false), mediaStream: mediaStream);
     } 
     _player.stop();
   }
@@ -124,10 +118,14 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
   void _performHangup() {
     if (!_answered) {
       setState(() => _declined = true ); 
-      callInbound?.hangup({'status_code': 603});
+      callDirections?.hangup({'status_code': 603});
     } else {
-      callInbound?.hangup({'status_code': 603});
+      callDirections?.hangup({'status_code': 603});
     }
+
+    _localStream?.getTracks().forEach((track) {
+      track.stop();
+    });
   }
 
   void _handelStreams(CallState event) async {
@@ -163,7 +161,7 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
     }
     Timer(const Duration(milliseconds: 100), () {
       _player.stop();
-      callInbound = null;
+      callDirections = null;
       Navigator.of(context).pop();
     });
   }
@@ -196,8 +194,8 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
               children: [
                 const SizedBox(height: 10,), 
                 const Spacer(), 
-                displayName(callInbound!.remote_display_name!),
-                displayRemoteIdentity(callInbound!.remote_identity!),
+                displayName(callDirections!.remote_display_name!),
+                displayRemoteIdentity(callDirections!.remote_identity!),
                 const SizedBox(height: 50,),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center, 
@@ -258,7 +256,7 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
                 const Spacer(), 
                 const SizedBox(height: 10,),
                 displayName(destinationName),
-                displayRemoteIdentity(callInbound!.remote_identity!),
+                displayRemoteIdentity(callDirections!.remote_identity!),
                 const SizedBox(height: 20),
                 StreamBuilder<int>(
                   stream: _stopWatchTimer.rawTime,
@@ -351,10 +349,10 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
                   ],
                 ),
                 const SizedBox(height: 20,),
-                Container( 
+                Container(
                   color: Colors.white10,
                   child: Row(
-                    children: [ 
+                    children: [
                       Expanded(
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 10),
@@ -419,7 +417,7 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
           setState(() {
             _stopWatchTimer.onStartTimer();
             _loading = false;
-          }); 
+          });
         }
         break;
       case CallStateEnum.ACCEPTED:
@@ -429,7 +427,6 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
             _stopWatchTimer.onStartTimer();
             _loading = false;
           });
-          _registerCallGet(extensionNo, callInbound!.remote_identity!, callInbound!.remote_display_name!); 
         }
         break;
       case CallStateEnum.CONFIRMED:
@@ -480,59 +477,10 @@ class InitiationPageState extends State<InitiationPage> implements SipUaHelperLi
     super.deactivate();
     helper!.removeSipUaHelperListener(this);
     _disposeRenderers();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-    _searchController.dispose();
-  }
+  } 
 
   @override
   void onNewReinvite(ReInvite event) {
     // TODO: implement onNewReinvite
-  }
-
-  Row avatarDisplayImage(int type) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: type == 2 ? width * 0.33 : width * 0.45,
-          height: type == 2 ? width * 0.33 : width * 0.45,
-          decoration: BoxDecoration(
-            color: primaryColor,
-            borderRadius: BorderRadius.all(Radius.circular(height * 0.15)),
-            border: Border.all(
-              width: 8,
-              color: primaryColor,
-              style: BorderStyle.solid,
-            ),
-          ),
-          child: CircleAvatar(
-            radius: headerSize,
-            backgroundColor: backgroundColor,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Container avatarPlaceholder() {
-    return Container(
-      width: width * 0.33,
-      height: width * 0.33,
-      decoration: BoxDecoration(
-        color: textColor2,
-        borderRadius: BorderRadius.all(Radius.circular(height * 0.15)),
-        border: Border.all(
-          width: 8,
-          color: primaryColor,
-          style: BorderStyle.solid,
-        ),
-      ),
-      child: const Icon(Icons.add, color: primaryColor),
-    );
   }
 }
