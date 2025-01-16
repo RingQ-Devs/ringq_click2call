@@ -1,19 +1,16 @@
-// ignore_for_file: use_build_context_synchronously, deprecated_member_use, prefer_interpolation_to_compose_strings
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use, prefer_interpolation_to_compose_strings, unused_field
 
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:avatar_glow/avatar_glow.dart';
 import 'package:carbon_icons/carbon_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:js/js_util.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart'; 
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
-import 'assets.dart';
-import 'initiation.dart';
+import 'assets.dart'; 
 import 'package:sip_ua/sip_ua.dart';
-import 'package:flutter/material.dart';
-import 'package:boxicons/boxicons.dart';
+import 'package:flutter/material.dart'; 
 import 'package:audioplayers/audioplayers.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -87,7 +84,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
       await Future.delayed(const Duration(seconds: 1));
       _performCall(context, true);
     }
-  }
+  } 
 
   _performCall(BuildContext context, [bool voiceOnly = false]) async {
     MediaStream mediaStream;
@@ -101,8 +98,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     MediaStream mediaStream;
     final mediaConstraints = <String, dynamic>{'audio': true, 'video': false};
     mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-    if (callDirections != null) { 
-      invokeDialer('inbound', callDirections!.remote_identity!);
+    if (callDirections != null) {
       _registerCallGet(extensionNo, callDirections!.remote_identity!, callDirections!.remote_display_name!); 
 
       callDirections?.answer(sipUAHelper.buildCallOptions(!false), mediaStream: mediaStream);
@@ -113,14 +109,19 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   _registerCallGet(String extension, String number, String queueNumber ) async {
     http.Response response;
     try {
-      String trimmedQueueNumber = queueNumber.replaceAll("(", "").replaceAll(")", ""); 
+      String trimmedQueueNumber = queueNumber.replaceAll("(", "").replaceAll(")", "");
       response = await http.get(
         Uri.parse("https://demo.us1.ringq.ai:8443/register/calllog/1/"+ username + "/"+ number +"/"+ trimmedQueueNumber),
       );
       Map content = json.decode(response.body);
-      prettyLog(content["content"]);
-      if (content["result"] == "success" && content["registered"] == "false") { 
-        openFloatingWindow(content["content"]);
+      prettyLog(content);
+      if (content["result"] == "success") {
+        if (content["registered"] == "true") {
+          navigateContactDetails(content["content"]);
+        }
+        if (content["registered"] == "false") {
+          newContact(queueNumber, number);
+        }
       }
     } catch (e) {
       setState(() { 
@@ -136,10 +137,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     } else {
       callDirections?.hangup({'status_code': 603});
     }
-
-    _localStream?.getTracks().forEach((track) {
-      track.stop();
-    });
   }
 
   _initRenderers() async {
@@ -451,7 +448,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
           )
         : !_answered
           ? Column(
-              children: [
+              children: [ 
                 const SizedBox(height: 10,), 
                 const Spacer(),
                 displayName(callDirections!.remote_display_name!),
@@ -513,8 +510,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
               children: [
                 const SizedBox(height: 10),
                 displayLogo(context),
-                const Spacer(), 
-                const SizedBox(height: 10,),
+                const Spacer(),
                 displayName(destinationName),
                 displayRemoteIdentity(callDirections!.remote_identity!),
                 const SizedBox(height: 20),
@@ -535,7 +531,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                   },
                 ),
                 const Spacer(),
-                Row( 
+                Row(
                   children: [
                     Expanded(
                       child: Column(
@@ -665,11 +661,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
     switch (callState.state)  {
       case CallStateEnum.CALL_INITIATION:
-        prettyLog({
-          'file': 'dialer.dart',
-          'direction': call.direction
-        });
-        
         setState(() => callDirections = call);
         if (call.direction == "INCOMING") {
           toggleSoftphonePanel(true);
@@ -729,26 +720,34 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
       case CallStateEnum.UNHOLD:
         break;
       case CallStateEnum.ENDED:
+        _clearStreams();
         setState(() {
+          destination = '';
           inProgress = false;
           _answered = false;
           _muteCall = false;
           _holdCall = false;
         }); 
         _stopWatchTimer.onResetTimer();
-        _player.stop();
-        _clearStreams();
+        _player.stop(); 
+        _localStream?.getTracks().forEach((track) {
+          track.stop();
+        });
         break; 
       case CallStateEnum.FAILED:
+        _clearStreams(); 
         setState(() {
+          destination = '';
           inProgress = false;
           _answered = false;
           _muteCall = false;
           _holdCall = false;
         });
         _stopWatchTimer.onResetTimer();
-        _player.stop();
-        _clearStreams();
+        _player.stop(); 
+        _localStream?.getTracks().forEach((track) {
+          track.stop();
+        });
         _registerCallGet(extensionNo, callDirections!.remote_identity!, callDirections!.remote_display_name!);
         break;
       default:

@@ -6,7 +6,28 @@
 
   <script src="https://ringq-dev-ed.develop.lightning.force.com/support/api/62.0/lightning/opencti_min.js" type="application/javascript"></script>
 
-  <script type="text/javascript">
+  <script type="text/javascript"> 
+    function newContact(firstName, phone) {
+      sforce.opencti.screenPop({
+        type: sforce.opencti.SCREENPOP_TYPE.NEW_RECORD_MODAL,
+        params: {
+          entityName: "Contact",
+          defaultFieldValues: {
+            Phone: phone
+          }
+        }
+      })
+    }
+
+    function navigateContactDetails(url) {
+      sforce.opencti.screenPop({
+          type: sforce.opencti.SCREENPOP_TYPE.URL,
+          params: {
+              url: url
+          }
+      });
+    }
+    
     function checkSoftphonePanelVisibility() {
       return new Promise((resolve, reject) => {
         sforce.opencti.isSoftphonePanelVisible({
@@ -33,7 +54,7 @@
         deferred: false,
         callback: callback
       }); 
-    } 
+    }
 
     function toggleSoftphonePanel(visible) {
       sforce.opencti.setSoftphonePanelVisibility({
@@ -89,19 +110,13 @@
           .catch(error => {
             console.error("Error checking visibility callback:", error);
           });
- 
-          // Object.keys(response.returnValue).forEach(key => {
-          //   console.log(`Key: ${key}, Value: ${response.returnValue[key].Phone}`);
-          //   if (response.returnValue[key].Phone) {
-          //     invokeDialer('outbound', response.returnValue[key].Phone);
-          //   }
-          // }); 
       } else {
         console.error('Something went wrong! Errors:', response.errors);
       }
     };
  
     var listener = function(payload) {
+      console.log(payload);
       const phoneNumber = payload.number;
        
       const url = new URL(window.location.href);

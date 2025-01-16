@@ -18,6 +18,8 @@ import 'package:js/js.dart';
 @JS()external void invokeDialer(String direction, String phoneNumber);
 @JS()external void toggleSoftphonePanel(bool hidden);
 @JS()external void openFloatingWindow(String url);
+@JS()external void newContact(String name, String phoneNumber);
+@JS()external void navigateContactDetails(String url);
 
 Call? callDirections;
 bool inProgress = false;
