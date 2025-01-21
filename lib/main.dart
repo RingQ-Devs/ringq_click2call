@@ -32,7 +32,7 @@ class _MyAppState extends State<MyApp> {
   checkAuthorize(dialerName) async {
     try {
       final response = await http.post(
-        Uri.parse('https://demo.us1.ringq.ai:8443/register/calllog'),
+        Uri.parse('https://${hostnameParam.host}:8443/register/calllog'),
         body: {'dialer_name': dialerName},
       );
 
@@ -62,6 +62,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+
+    print(hostnameParam.host);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       String currentUrl = html.window.location.href;

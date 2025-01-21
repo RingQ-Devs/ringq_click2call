@@ -68,8 +68,8 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     settings.dtmfMode = DtmfMode.RFC2833;
     settings.displayName = widget.username;
     settings.password = widget.password;
-    settings.uri = 'sip:${widget.extensionNo}@demo.us1.ringq.ai:7443';
-    settings.webSocketUrl = 'wss://demo.us1.ringq.ai:7443';
+    settings.uri = 'sip:${widget.extensionNo}@${hostnameParam.host}:7443';
+    settings.webSocketUrl = 'wss://${hostnameParam.host}:7443';
     settings.userAgent = 'RingQ Webapp w$versionNumber';
     sipUAHelper.start(settings);
 
@@ -111,7 +111,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     try {
       String trimmedQueueNumber = queueNumber.replaceAll("(", "").replaceAll(")", "");
       response = await http.get(
-        Uri.parse("https://demo.us1.ringq.ai:8443/register/calllog/1/"+ username + "/"+ number +"/"+ trimmedQueueNumber),
+        Uri.parse("https://${hostnameParam.host}:8443/register/calllog/1/"+ username + "/"+ number +"/"+ trimmedQueueNumber),
       );
       Map content = json.decode(response.body);
       prettyLog(content);
@@ -666,7 +666,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
           toggleSoftphonePanel(true);
 
           _player.play(
-            UrlSource('https://demo.us1.ringq.ai:8443/audio/ringtone2.mp3'), 
+            UrlSource('https://${hostnameParam.host}:8443/audio/ringtone2.mp3'), 
             mode: PlayerMode.lowLatency,
           );
         }
@@ -763,7 +763,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     });
 
     _player.play(
-      UrlSource('https://demo.us1.ringq.ai:8443/audio/ringtone2.mp3'), 
+      UrlSource('https://${hostnameParam.host}:8443/audio/ringtone2.mp3'), 
       mode: PlayerMode.lowLatency,
     );
     _player.stop();

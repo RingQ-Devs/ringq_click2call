@@ -1,0 +1,31 @@
+<callCenter>
+      <section sortOrder="0" name="reqGeneralInfo" label="General Info">
+            <item sortOrder="0" name="reqInternalName"
+                  label="Internal Name">callCenter001</item>
+            <item sortOrder="1" name="reqDisplayName"
+                  label="Display Name">My Call Center</item>   
+            <item sortOrder="2" name="reqAdapterUrl" 
+                  label="CTI Adapter URL"></item>
+            <item sortOrder="3" name="reqUseCTIAPI" 
+                  label="Use CTI API">true</item>
+            <item sortOrder="4" name="reqSoftphoneHeight" 
+                  label="Softphone Height">525</item>
+            <item sortOrder="5" name="reqSoftphoneWidth" 
+                  label="Softphone Width">350</item>
+            <item sortOrder="6" name="reqSalesforceCompatibilityMode" 
+                  label="Salesforce Compatibility Mode">Classic_and_Lightning</item>
+            <item sortOrder="7" name="reqDescription" 
+                  label="Description"></item>
+            <item sortOrder="8" name="reqProgId" 
+                  label="Program Id"></item>
+      </section>
+
+      <section sortOrder="1" name="DialingOptions" label="Dialing Options">
+      <item sortOrder="0" name="OutsidePrefix"
+            label="Outside Prefix">1</item>
+      <item sortOrder="1" name="LongDistPrefix"
+            label="Long Distance Prefix">9</item>
+      <item sortOrder="2" name="InternationalPrefix"
+            label="International Prefix">01</item>
+      </section>
+</callCenter>

@@ -71,7 +71,7 @@ int supervisorMode = 0;
 int chameleonMode = 0;
 
 io.Socket? socket;
-Uri? hostnameParam;
+final hostnameParam = Uri.base;
 
 enum Direction { incoming, outgoing }
 
