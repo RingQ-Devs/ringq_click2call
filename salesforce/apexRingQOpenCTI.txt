@@ -1,0 +1,13 @@
+global class RetrieveAccount {
+    webService static String getUserDetail() {
+        List<User> users = [
+            SELECT SIP_Extension__c, SIP_Username__c, SIP_Password__c, RingQ_Server__c
+            FROM User 
+            WHERE Id = :UserInfo.getUserId()
+            LIMIT 1
+        ];
+                
+        String jsonResult = JSON.serialize(users[0]);
+        return jsonResult;
+    }
+}

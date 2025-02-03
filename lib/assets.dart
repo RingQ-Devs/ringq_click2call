@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import 'package:intl/intl.dart';
@@ -15,11 +16,46 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:elegant_notification/elegant_notification.dart';
 import 'package:js/js.dart';
 
-@JS()external void invokeDialer(String direction, String phoneNumber);
+@JS()external void sfInvokeDialerJS(String direction, String phoneNumber, Function callback);
 @JS()external void toggleSoftphonePanel(bool hidden);
 @JS()external void openFloatingWindow(String url);
-@JS()external void newContact(String name, String phoneNumber);
-@JS()external void navigateContactDetails(String url);
+@JS()external void sfNewContactJS(String phoneNumber);
+@JS()external void sfcNavigate(String url);
+@JS()external void runApexGetUserDetail(Function callback);
+@JS()external void startCallListener(Function callback);
+@JS()external void sfSearchRecordJS(String callerNumber, String searchDefaultOrder, String defaultPopupFormAPIName);
+
+getUserDetail() {
+  final completer = Completer<dynamic>();
+
+  runApexGetUserDetail(allowInterop((result) {
+    completer.complete(result);
+  }));
+
+  return completer.future;
+}
+
+sfInvokeDialer(String number, String phoneNumber) {
+  final completer = Completer<dynamic>();
+
+  sfInvokeDialerJS(number, phoneNumber, allowInterop((result) {
+    completer.complete(result);
+  }));
+
+  return completer.future;
+}
+
+class CallListener {
+  static final StreamController<String> _callStreamController = StreamController.broadcast();
+
+  static Stream<String> get onNewCall => _callStreamController.stream;
+
+  static void initialize() {
+    startCallListener(allowInterop((String phoneNumber) {
+      _callStreamController.add(phoneNumber);
+    }));
+  }
+}
 
 Call? callDirections;
 bool inProgress = false;
@@ -70,9 +106,7 @@ double subParagraphSize = 9.0;
 int supervisorMode = 0;
 int chameleonMode = 0;
 
-io.Socket? socket;
-final hostnameParam = Uri.base;
-
+io.Socket? socket; 
 enum Direction { incoming, outgoing }
 
 final beepPlayer = AudioPlayer();
@@ -82,26 +116,28 @@ void playBeepSound() async {
   await beepPlayer.setVolume(0.03);
   await beepPlayer.play();
 }
- 
-String destination = "";
-String destinationName = "";
-String supervisorCall = "";
-String versionNumber = "";
-String sessionCookie1 = "";
-String sessionCookie2 = "";
-String sessionCookie3 = "";
-String queueWaitingTime = "";
-String primaryOutbound = "";
-String url = "https://${hostnameParam!.host}:8443";
-String socketUrl = debug ? "" : "${hostnameParam!.host}:9443";
-String sipSocketUrl = debug ? "" : "${hostnameParam!.host}:7443";
-String sipUrl = debug ? "" : session['extension'] + "@" + session["subdomain"] + ":7443";
-String balance = "";
-String agentStatus = "";
+
+String ringqServer = '';
+String username = ''; 
+String password = ''; 
+String extentionNo = ''; 
+String destination = '';
+String destinationName = '';
+String supervisorCall = '';
+String versionNumber = '';
+String sessionCookie1 = '';
+String sessionCookie2 = '';
+String sessionCookie3 = '';
+String queueWaitingTime = '';
+String primaryOutbound = '';
+String url = "https://$ringqServer:8443";
+String socketUrl = debug ? '' : "$ringqServer:9443";
+String sipSocketUrl = debug ? '' : "$ringqServer:7443";
+String sipUrl = debug ? '' : "${session['extension']}@${session["subdomain"]}:7443";
+String balance = '';
+String agentStatus = '';
 String activeProfileStatus = "Available";
-String pinBasedDailing = "1";
-String extensionNo = "";
-String username = "";
+String pinBasedDailing = "1"; 
 
 Map session = {};
 Map callProfiles = {};
@@ -1189,7 +1225,7 @@ InputDecoration inputDecoration2 = InputDecoration(
 );
 
 String ivrParamOutput(bool voicemail, String extension) {
-  return voicemail ? "transfer *99$extension XML ${hostnameParam!.host}" : "transfer $extension XML ${hostnameParam!.host}";
+  return voicemail ? "transfer *99$extension XML $ringqServer" : "transfer $extension XML $ringqServer";
 }
 
 Text tableEntry1(String name, FontWeight fontWeight) {

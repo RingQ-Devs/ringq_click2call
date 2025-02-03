@@ -1,0 +1,27 @@
+<callCenter> 
+      <section sortOrder="0" name="reqGeneralInfo" label="General Information">
+            <item sortOrder="0" name="reqInternalName"
+                  label="InternalName">RingQOpenCTI</item> 
+            <item sortOrder="1" name="reqDisplayName" 
+                  label="Display Name">RingQ Open CTI</item>
+            <item sortOrder="2" name="reqAdapterUrl" 
+                  label="CTI Adapter URL">https://RingQServer.com/click2call?login=w2eI0qeZ8f1sPzy5dp</item> 
+            <item sortOrder="3" name="reqUseApi" 
+                  label="Use CTI API">true</item> 
+            <item sortOrder="4" name="reqSoftphoneHeight" 
+                  label="Softphone Height">525</item> 
+            <item sortOrder="5" name="reqSoftphoneWidth" 
+                  label="Softphone Width">350</item>
+            <item sortOrder="6" name="reqSalesforceCompatibilityMode" 
+                  label="Salesforce Compatibility Mode">Classic_and_Lightning</item>
+      </section>
+
+      <section sortOrder="1" name="DialingOptions" label="Dialing Options">
+            <item sortOrder="0" name="OutsidePrefix"
+                  label="Outside Prefix">1</item>
+            <item sortOrder="1" name="LongDistPrefix"
+                  label="Long Distance Prefix">9</item>
+            <item sortOrder="2" name="InternationalPrefix"
+                  label="International Prefix">01</item>
+      </section>
+</callCenter>

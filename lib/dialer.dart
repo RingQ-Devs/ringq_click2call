@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously, deprecated_member_use, prefer_interpolation_to_compose_strings, unused_field
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use, prefer_interpolation_to_compose_strings, unused_field, avoid_print
 
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:avatar_glow/avatar_glow.dart';
@@ -16,21 +16,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class Dialer extends StatefulWidget {
-  final String title;
-  final String extensionNo;
-  final String username;
-  final String password;
-  final String callNumber;
-
-  const Dialer({
-    super.key,
-    required this.title,
-    required this.extensionNo,
-    required this.username,
-    required this.password,
-    required this.callNumber
-  });
-
+  const Dialer({ super.key,  }); 
   @override
   State<Dialer> createState() => _DialerState();
 }
@@ -51,6 +37,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   final AudioPlayer _player = AudioPlayer();
   final SIPUAHelper sipUAHelper = SIPUAHelper();
   final StopWatchTimer _stopWatchTimer = StopWatchTimer();
+  var order = [];
 
   @override
   void initState() {
@@ -60,31 +47,81 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   }
 
   _initializeCallFlow() async {
+    var resultUserDetail = await getUserDetail();
+    var userDetail = json.decode(resultUserDetail);
+
+    setState(() {
+      extentionNo = userDetail['SIP_Extension__c'];
+      username = userDetail['SIP_Username__c'];
+      password = userDetail['SIP_Password__c'];
+      ringqServer =  userDetail['RingQ_Server__c'].replaceFirst(RegExp(r'^https://'), '');
+    });
+
     await Future.delayed(const Duration(seconds: 1));
     sipUAHelper.addSipUaHelperListener(this);
     UaSettings settings = UaSettings();
     settings.webSocketSettings.allowBadCertificate = true;
     settings.transportType = TransportType.WS;
     settings.dtmfMode = DtmfMode.RFC2833;
-    settings.displayName = widget.username;
-    settings.password = widget.password;
-    settings.uri = 'sip:${widget.extensionNo}@${hostnameParam.host}:7443';
-    settings.webSocketUrl = 'wss://${hostnameParam.host}:7443';
+    settings.displayName = username;
+    settings.password = password;
+    settings.uri = 'sip:$extentionNo@$ringqServer:7443';
+    settings.webSocketUrl = 'wss://$ringqServer:7443';
     settings.userAgent = 'RingQ Webapp w$versionNumber';
-    sipUAHelper.start(settings);
-
-    setState(() {
-      extensionNo = widget.extensionNo;
-      username = widget.username;
-    });
-
-    if (widget.callNumber.isNotEmpty) {
-      setState(() => destination = widget.callNumber);
+    sipUAHelper.start(settings); 
  
-      await Future.delayed(const Duration(seconds: 1));
-      _performCall(context, true);
+    _getSearchOrder(ringqServer);
+
+    await Future.delayed(const Duration(seconds: 1));
+
+    CallListener.initialize();
+    CallListener.onNewCall.listen((payload) async {
+      var res = json.decode(payload); 
+      // var invokedDialer = await await sfInvokeDialer('outbound', res['number']);
+      // var invokedDialerData = json.decode(invokedDialer);
+
+    
+      
+      // prettyLog({
+      //   "Outbound invokedDialerData": invokedDialerData
+      // }); 
+      setState(() => destination = res['number']); 
+       _performCall(context, true);
+       toggleSoftphonePanel(true);
+    }); 
+  }
+
+  _getSearchOrder(hostServer) async { 
+    try {
+      final response = await http.post(Uri.parse('https://$hostServer:8443/register/calllog'), 
+        body: {'dialer_name': "$username@$extentionNo"},
+      );
+
+      if (response.statusCode == 200) {
+        var res = json.decode(response.body);
+
+        if (res['result'] == 'success') {
+          setState(() {
+            order = res['content']['priority']
+                .split("/")
+                .map((e) => e.trim())
+                .toList();
+          });
+
+          prettyLog({
+            order
+          });
+        }
+      } else {
+        print('Failed to send POST request. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      prettyLog({
+        'post': '/register/calllog',
+        'error': e
+      });
     }
-  } 
+  }
 
   _performCall(BuildContext context, [bool voiceOnly = false]) async {
     MediaStream mediaStream;
@@ -99,34 +136,38 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     final mediaConstraints = <String, dynamic>{'audio': true, 'video': false};
     mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
     if (callDirections != null) {
-      _registerCallGet(extensionNo, callDirections!.remote_identity!, callDirections!.remote_display_name!); 
+      _registerCallGet(callDirections!.remote_identity!, callDirections!.remote_display_name!);
 
+      var invokedDialer = await sfInvokeDialer('inbound', callDirections!.remote_identity!);
+      if (invokedDialer is String) {
+        var invokedDialerData = json.decode(invokedDialer);
+        prettyLog({
+          "Inbound invokedDialerData": invokedDialerData
+        });
+        if (invokedDialerData['success']) {
+          if (invokedDialerData['returnValue'] is Map && (invokedDialerData['returnValue'] as Map).isEmpty) {
+            sfNewContactJS(callDirections!.remote_identity!);
+          }
+        }
+      } else {
+        print("Error: Expected a JSON string, but got: $invokedDialer");
+      }
       callDirections?.answer(sipUAHelper.buildCallOptions(!false), mediaStream: mediaStream);
     } 
     _player.stop();
   }
 
-  _registerCallGet(String extension, String number, String queueNumber ) async {
-    http.Response response;
+  _registerCallGet(String number, String queueNumber ) async { 
     try {
       String trimmedQueueNumber = queueNumber.replaceAll("(", "").replaceAll(")", "");
+      http.Response response;
       response = await http.get(
-        Uri.parse("https://${hostnameParam.host}:8443/register/calllog/1/"+ username + "/"+ number +"/"+ trimmedQueueNumber),
+        Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ username + "/"+ number +"/"+ trimmedQueueNumber),
       );
       Map content = json.decode(response.body);
       prettyLog(content);
-      if (content["result"] == "success") {
-        if (content["registered"] == "true") {
-          navigateContactDetails(content["content"]);
-        }
-        if (content["registered"] == "false") {
-          newContact(queueNumber, number);
-        }
-      }
     } catch (e) {
-      setState(() { 
-        showSnackbar(context, "An error has occured.", redColor);
-      });
+      prettyLog(e);
     }
   }
 
@@ -273,7 +314,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                             Column(
                               children: [
                                 AutoSizeText(
-                                  dialerStatus ? "Online (${widget.extensionNo})"  : "Offline (${widget.extensionNo})",
+                                  dialerStatus ? "Online ($extentionNo)"  : "Offline ($extentionNo)",
                                   style: TextStyle(
                                     color: whiteColor,
                                     fontSize: paragraphSize,
@@ -666,7 +707,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
           toggleSoftphonePanel(true);
 
           _player.play(
-            UrlSource('https://${hostnameParam.host}:8443/audio/ringtone2.mp3'), 
+            UrlSource('https://$ringqServer:8443/audio/ringtone2.mp3'), 
             mode: PlayerMode.lowLatency,
           );
         }
@@ -706,8 +747,8 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         setState(() => _answered = true);
         _stopWatchTimer.onResetTimer();
         _stopWatchTimer.onStartTimer();
-        _player.stop();
-        _registerCallGet(extensionNo, callDirections!.remote_identity!, callDirections!.remote_display_name!);
+        _player.stop(); 
+        _registerCallGet(callDirections!.remote_identity!, callDirections!.remote_display_name!);
         break;
       case CallStateEnum.CONFIRMED:
         break;
@@ -747,8 +788,8 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         _player.stop(); 
         _localStream?.getTracks().forEach((track) {
           track.stop();
-        });
-        _registerCallGet(extensionNo, callDirections!.remote_identity!, callDirections!.remote_display_name!);
+        }); 
+        _registerCallGet(callDirections!.remote_identity!, callDirections!.remote_display_name!);
         break;
       default:
     }
@@ -763,7 +804,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     });
 
     _player.play(
-      UrlSource('https://${hostnameParam.host}:8443/audio/ringtone2.mp3'), 
+      UrlSource('https://$ringqServer:8443/audio/ringtone2.mp3'), 
       mode: PlayerMode.lowLatency,
     );
     _player.stop();
@@ -818,4 +859,4 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     sipUAHelper.removeSipUaHelperListener(this);
     _disposeRenderers();
   }
-} 
+}  
