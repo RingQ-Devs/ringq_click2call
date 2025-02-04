@@ -36,8 +36,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   bool _declined = false;
   final AudioPlayer _player = AudioPlayer();
   final SIPUAHelper sipUAHelper = SIPUAHelper();
-  final StopWatchTimer _stopWatchTimer = StopWatchTimer();
-  var order = [];
+  final StopWatchTimer _stopWatchTimer = StopWatchTimer(); 
 
   @override
   void initState() {
@@ -47,7 +46,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   }
 
   _initializeCallFlow() async {
-    var resultUserDetail = await getUserDetail();
+    var resultUserDetail = await getSfUserDetail();
     var userDetail = json.decode(resultUserDetail);
 
     setState(() {
@@ -76,18 +75,15 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
     CallListener.initialize();
     CallListener.onNewCall.listen((payload) async {
-      var res = json.decode(payload); 
-      // var invokedDialer = await await sfInvokeDialer('outbound', res['number']);
-      // var invokedDialerData = json.decode(invokedDialer);
-
-    
-      
-      // prettyLog({
-      //   "Outbound invokedDialerData": invokedDialerData
-      // }); 
+      var res = json.decode(payload);
+      prettyLog({
+        'asdfasdfasdfasdf',
+        res
+      });
+      sfNavigateRecord(res['objectType'], res['number']);
       setState(() => destination = res['number']); 
        _performCall(context, true);
-       toggleSoftphonePanel(true);
+       sfToggleSoftphonePanelJS(true);
     }); 
   }
 
@@ -98,19 +94,14 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
       );
 
       if (response.statusCode == 200) {
-        var res = json.decode(response.body);
-
+        var res = json.decode(response.body); 
         if (res['result'] == 'success') {
           setState(() {
-            order = res['content']['priority']
-                .split("/")
-                .map((e) => e.trim())
-                .toList();
+            prioritySfSearchOrder = res['content']['priority'];
+            prioritySfForm = res['content']['form'];
           });
 
-          prettyLog({
-            order
-          });
+          prettyLog(res['content']);
         }
       } else {
         print('Failed to send POST request. Status code: ${response.statusCode}');
@@ -136,38 +127,41 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     final mediaConstraints = <String, dynamic>{'audio': true, 'video': false};
     mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
     if (callDirections != null) {
-      _registerCallGet(callDirections!.remote_identity!, callDirections!.remote_display_name!);
-
-      var invokedDialer = await sfInvokeDialer('inbound', callDirections!.remote_identity!);
-      if (invokedDialer is String) {
-        var invokedDialerData = json.decode(invokedDialer);
-        prettyLog({
-          "Inbound invokedDialerData": invokedDialerData
-        });
-        if (invokedDialerData['success']) {
-          if (invokedDialerData['returnValue'] is Map && (invokedDialerData['returnValue'] as Map).isEmpty) {
-            sfNewContactJS(callDirections!.remote_identity!);
-          }
-        }
-      } else {
-        print("Error: Expected a JSON string, but got: $invokedDialer");
-      }
+      sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''));
       callDirections?.answer(sipUAHelper.buildCallOptions(!false), mediaStream: mediaStream);
-    } 
+      _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound');
+      prettyLog({
+        'prioritySfForm': prioritySfForm
+      }); 
+    }
     _player.stop();
   }
 
-  _registerCallGet(String number, String queueNumber ) async { 
+  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String callDirection) async { 
+    http.Response response;
     try {
-      String trimmedQueueNumber = queueNumber.replaceAll("(", "").replaceAll(")", "");
-      http.Response response;
+      // String trimmedQueueNumber = callerDestination.replaceAll("(", "").replaceAll(")", "");
       response = await http.get(
-        Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ username + "/"+ number +"/"+ trimmedQueueNumber),
+        Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ callDirection), 
       );
-      Map content = json.decode(response.body);
-      prettyLog(content);
+      if (response.statusCode == 200) {
+        Map content = json.decode(response.body);
+        prettyLog({
+          "username": sipUsername,
+          "number": callerNumber,
+          "trimmedQueueNumber": callerDestination
+        });
+
+        prettyLog(content);
+      } else {
+        prettyLog({
+          'error'
+        });
+      }
     } catch (e) {
-      prettyLog(e);
+      prettyLog({
+        '_registerCallGet error:': e
+      });
     }
   }
 
@@ -704,7 +698,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
       case CallStateEnum.CALL_INITIATION:
         setState(() => callDirections = call);
         if (call.direction == "INCOMING") {
-          toggleSoftphonePanel(true);
+          sfToggleSoftphonePanelJS(true);
 
           _player.play(
             UrlSource('https://$ringqServer:8443/audio/ringtone2.mp3'), 
@@ -748,7 +742,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         _stopWatchTimer.onResetTimer();
         _stopWatchTimer.onStartTimer();
         _player.stop(); 
-        _registerCallGet(callDirections!.remote_identity!, callDirections!.remote_display_name!);
+        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound');
         break;
       case CallStateEnum.CONFIRMED:
         break;
@@ -781,15 +775,15 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
           destination = '';
           inProgress = false;
           _answered = false;
-          _muteCall = false;
+          _muteCall = false;  
           _holdCall = false;
         });
         _stopWatchTimer.onResetTimer();
         _player.stop(); 
         _localStream?.getTracks().forEach((track) {
           track.stop();
-        }); 
-        _registerCallGet(callDirections!.remote_identity!, callDirections!.remote_display_name!);
+        });
+        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'misscall');
         break;
       default:
     }

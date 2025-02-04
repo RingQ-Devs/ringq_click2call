@@ -17,18 +17,16 @@ import 'package:elegant_notification/elegant_notification.dart';
 import 'package:js/js.dart';
 
 @JS()external void sfInvokeDialerJS(String direction, String phoneNumber, Function callback);
-@JS()external void toggleSoftphonePanel(bool hidden);
-@JS()external void openFloatingWindow(String url);
-@JS()external void sfNewContactJS(String phoneNumber);
-@JS()external void sfcNavigate(String url);
-@JS()external void runApexGetUserDetail(Function callback);
+@JS()external void sfToggleSoftphonePanelJS(bool hidden); 
+@JS()external void sfRunApexGetUserDetailJS(Function callback);
 @JS()external void startCallListener(Function callback);
 @JS()external void sfSearchRecordJS(String callerNumber, String searchDefaultOrder, String defaultPopupFormAPIName);
+@JS()external void sfNavigateRecord(String navigatePage, String callerNumber);
 
-getUserDetail() {
+getSfUserDetail() {
   final completer = Completer<dynamic>();
 
-  runApexGetUserDetail(allowInterop((result) {
+  sfRunApexGetUserDetailJS(allowInterop((result) {
     completer.complete(result);
   }));
 
@@ -123,6 +121,8 @@ String password = '';
 String extentionNo = ''; 
 String destination = '';
 String destinationName = '';
+String prioritySfSearchOrder = '';
+String prioritySfForm = '';
 String supervisorCall = '';
 String versionNumber = '';
 String sessionCookie1 = '';

@@ -7,7 +7,7 @@
   <script src="https://ringq-dev-ed.develop.lightning.force.com/support/api/62.0/lightning/opencti_min.js" type="application/javascript"></script>
 
   <script type="text/javascript">
-    function runApexGetUserDetail(callback) {
+    function sfRunApexGetUserDetailJS(callback) {
       sforce.opencti.runApex({
         apexClass: 'RingQ',
         methodName: 'getUserDetail',
@@ -105,7 +105,7 @@
       });
     }
 
-    function toggleSoftphonePanel(visible) {
+    function sfToggleSoftphonePanelJS(visible) {
       sforce.opencti.setSoftphonePanelVisibility({
         visible: visible,
         callback: function(response) {
@@ -137,7 +137,7 @@
       if (response.success) {
         checkSoftphonePanelVisibility()
           .then(isVisible => {
-            if (isVisible) toggleSoftphonePanel(true);
+            if (isVisible) sfToggleSoftphonePanelJS(true);
           })
           .catch(error => {
             console.error("Error checking visibility callback:", error);
@@ -146,10 +146,6 @@
         console.error('Something went wrong! Errors:', response.errors);
       }
     };
-
-    const callerNumber = '63401006';
-    const searchDefaultOrder = 'Accounts / Leads / Contacts';
-    const defaultPopupFormAPIName = 'Contact';
 
     function sfSearchRecordJS(callerNumber, searchDefaultOrder, defaultPopupFormAPIName) {
       sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
@@ -183,15 +179,16 @@
           const currentSearch = searchOrder[index];
 
           let searchMethodName = '';
-          if (currentSearch === 'Contacts') {
+          if (currentSearch === 'Contact') {
             searchMethodName = 'findContactDetail';
-          } else if (currentSearch === 'Leads') {
+          } else if (currentSearch === 'Lead') {
             searchMethodName = 'findLeadsDetail';
-          } else if (currentSearch === 'Accounts') {
+          } else if (currentSearch === 'Account') {
             searchMethodName = 'findAccountDetail';
           }
 
           sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, (data) => {
+            console.log('searchMethodName', data);
             const result = JSON.parse(data);
             if (result && Object.keys(result).length !== 0) {
               sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`);
@@ -205,6 +202,26 @@
         }
 
         searchNext(0);
+      });
+    }
+
+    function sfNavigateRecord(navigatePage, callerNumber) {
+      let searchMethodName = '';
+      if (navigatePage === 'Contact') {
+        searchMethodName = 'findContactDetail';
+      } else if (navigatePage === 'Lead') {
+        searchMethodName = 'findLeadsDetail';
+      } else if (navigatePage === 'Account') {
+        searchMethodName = 'findAccountDetail';
+      }
+
+      sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
+        sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, (data) => {
+          const result = JSON.parse(data);
+          if (result && Object.keys(result).length !== 0) {
+            sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`);
+          }
+        });
       });
     }
  
