@@ -76,10 +76,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     CallListener.initialize();
     CallListener.onNewCall.listen((payload) async {
       var res = json.decode(payload);
-      prettyLog({
-        'asdfasdfasdfasdf',
-        res
-      });
       sfNavigateRecord(res['objectType'], res['number']);
       setState(() => destination = res['number']); 
        _performCall(context, true);
