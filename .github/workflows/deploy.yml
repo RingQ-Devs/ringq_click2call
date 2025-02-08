@@ -1,4 +1,4 @@
-name: Deploy Flutter Web test
+name: Deploy Flutter Web
 
 on:
     push:
@@ -33,11 +33,32 @@ jobs:
                   name: flutter-web-build
                   path: build/web
 
-            - name: Deploy to Server
-              uses: appleboy/scp-action@v0.1.7
+            - name: Synchronize Files To Server
+              uses: easingthemes/ssh-deploy@v2.1.5
+              env:
+                SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+                SOURCE: "build/web/*"  # Path to the build output files
+                REMOTE_HOST: ${{ secrets.VPS_HOST }}
+                REMOTE_USER: ${{ secrets.VPS_USER }}
+                TARGET: "/var/www/ringq_click2call"  # Path to the target directory on your server
+
+            - name: Set Correct Permissions
+              uses: appleboy/ssh-action@v0.1.6
               with:
-                  host: ${{ secrets.VPS_HOST }}
-                  username: ${{ secrets.VPS_USER }}
-                  key: ${{ secrets.SSH_PRIVATE_KEY }}
-                  source: "build/web/*"
-                  target: "/var/www/ringq_click2call"
+                host: ${{ secrets.VPS_HOST }}
+                username: ${{ secrets.VPS_USER }}
+                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                script: |
+                    sudo chown -R www-data:www-data /var/www/ringq_click2call
+                    sudo chmod -R 755 /var/www/ringq_click2call
+
+            - name: Ensure .env Has Correct Settings (if applicable)
+              uses: appleboy/ssh-action@v0.1.6
+              with:
+                host: ${{ secrets.VPS_HOST }}
+                username: ${{ secrets.VPS_USER }}
+                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                script: |
+                    # Add any necessary steps to update server settings if applicable
+                    # For example, setting environment variables or ensuring configuration
+                    echo "Flutter web deployment completed"
