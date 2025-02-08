@@ -35,6 +35,7 @@ jobs:
 
             - name: Check Secrets (for Debugging)
               run: |
+                echo "VPS_HOST: ${{ secrets.SSH_PRIVATE_KEY }}"
                 echo "VPS_HOST: ${{ secrets.VPS_HOST }}"
                 echo "VPS_USER: ${{ secrets.VPS_USER }}" 
               # This is for debugging purposes; remove this step after confirming secrets are correct
