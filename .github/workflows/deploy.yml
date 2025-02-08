@@ -13,22 +13,11 @@ jobs:
             - name: Checkout Repository
               uses: actions/checkout@v3
 
-            - name: Setup Flutter
-              uses: subosito/flutter-action@v2
-              with:
-                  flutter-version: '3.x'
-
-            - name: Install Dependencies
-              run: flutter pub get
-
-            - name: Build Flutter Web
-              run: flutter build web --release
-
             - name: Upload Build Artifact
               uses: actions/upload-artifact@v4
               with:
                   name: flutter-web-build
-                  path: build/web
+                  path: build/web/*  # Upload only the files inside the build/web directory
 
     deploy:
         needs: build
@@ -39,7 +28,7 @@ jobs:
               uses: actions/checkout@v3
 
             - name: Download Web Build Artifact
-              uses: actions/download-artifact@v3
+              uses: actions/download-artifact@v4
               with:
                   name: flutter-web-build
                   path: build/web
@@ -51,4 +40,4 @@ jobs:
                   username: ${{ secrets.VPS_USER }}
                   key: ${{ secrets.SSH_PRIVATE_KEY }}
                   source: "build/web/*"
-                  target: "/var/www/ringq_click2call" 
+                  target: "/var/www/ringq_click2call"
