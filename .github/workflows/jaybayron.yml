@@ -17,7 +17,7 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: flutter-web-build
-                  path: build/web/*  # Upload only the files inside the build/web directory
+                  path: build/web/*
 
     deploy:
         needs: build
@@ -36,20 +36,20 @@ jobs:
             - name: Set Up SSH
               run: |
                 mkdir -p ~/.ssh
-                echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+                echo "${{ secrets.JAYBAYRON_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
                 chmod 600 ~/.ssh/id_rsa
-                ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+                ssh-keyscan -H ${{ secrets.JAYBAYRON_VPS_HOST }} >> ~/.ssh/known_hosts
 
             - name: Synchronize Files To Server
               run: |
-                rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" build/web/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/ringq_click2call/
+                rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" build/web/ ${{ secrets.JAYBAYRON_VPS_USER }}@${{ secrets.JAYBAYRON_VPS_HOST }}:/var/www/portfolio/public/
 
             - name: Set Correct Permissions
               uses: appleboy/ssh-action@v0.1.6
               with:
-                host: ${{ secrets.VPS_HOST }}
-                username: ${{ secrets.VPS_USER }}
-                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                host: ${{ secrets.JAYBAYRON_VPS_HOST }}
+                username: ${{ secrets.JAYBAYRON_VPS_USER }}
+                key: ${{ secrets.JAYBAYRON_SSH_PRIVATE_KEY }}
                 script: |
                     sudo chown -R www-data:www-data /var/www/ringq_click2call
                     sudo chmod -R 755 /var/www/ringq_click2call
@@ -57,9 +57,9 @@ jobs:
             - name: Ensure .env Has Correct Settings (if applicable)
               uses: appleboy/ssh-action@v0.1.6
               with:
-                host: ${{ secrets.VPS_HOST }}
-                username: ${{ secrets.VPS_USER }}
-                key: ${{ secrets.SSH_PRIVATE_KEY }}
+                host: ${{ secrets.JAYBAYRON_VPS_HOST }}
+                username: ${{ secrets.JAYBAYRON_VPS_USER }}
+                key: ${{ secrets.JAYBAYRON_SSH_PRIVATE_KEY }}
                 script: |
                     # Add any necessary steps to update server settings if applicable
                     echo "Flutter web deployment completed"
