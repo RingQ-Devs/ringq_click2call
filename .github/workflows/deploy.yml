@@ -33,21 +33,16 @@ jobs:
                   name: flutter-web-build
                   path: build/web 
 
-            - name: Check Secrets (for Debugging)
+            - name: Set Up SSH
               run: |
-                echo "VPS_HOST: ${{ secrets.SSH_PRIVATE_KEY }}"
-                echo "VPS_HOST: ${{ secrets.VPS_HOST }}"
-                echo "VPS_USER: ${{ secrets.VPS_USER }}" 
-              # This is for debugging purposes; remove this step after confirming secrets are correct
+                mkdir -p ~/.ssh
+                echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+                chmod 600 ~/.ssh/id_rsa
+                ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
             - name: Synchronize Files To Server
-              uses: easingthemes/ssh-deploy@v2.1.5
-              env:
-                SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}  # SSH private key from GitHub Secrets
-                SOURCE: "build/web/*"  # Path to the build output files
-                REMOTE_HOST: ${{ secrets.VPS_HOST }}  # Server IP/hostname
-                REMOTE_USER: ${{ secrets.VPS_USER }}  # SSH user (e.g., ubuntu or root)
-                TARGET: "/var/www/ringq_click2call"  # Target directory on the server
+              run: |
+                rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" build/web/ ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:/var/www/ringq_click2call/
 
             - name: Set Correct Permissions
               uses: appleboy/ssh-action@v0.1.6
@@ -67,5 +62,4 @@ jobs:
                 key: ${{ secrets.SSH_PRIVATE_KEY }}
                 script: |
                     # Add any necessary steps to update server settings if applicable
-                    # For example, setting environment variables or ensuring configuration
                     echo "Flutter web deployment completed"
