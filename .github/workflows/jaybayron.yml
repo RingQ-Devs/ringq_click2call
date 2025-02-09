@@ -39,6 +39,7 @@ jobs:
                 echo "${{ secrets.JAYBAYRON_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
                 chmod 600 ~/.ssh/id_rsa
                 ssh-keyscan -H ${{ secrets.JAYBAYRON_VPS_HOST }} >> ~/.ssh/known_hosts
+                chmod 644 ~/.ssh/known_hosts  # Fix potential SSH permission issue
 
             - name: Synchronize Files To Server
               run: |
@@ -51,8 +52,8 @@ jobs:
                 username: ${{ secrets.JAYBAYRON_VPS_USER }}
                 key: ${{ secrets.JAYBAYRON_SSH_PRIVATE_KEY }}
                 script: |
-                    sudo chown -R www-data:www-data /var/www/ringq_click2call
-                    sudo chmod -R 755 /var/www/ringq_click2call
+                    sudo chown -R www-data:www-data /var/www/portfolio/public  # FIXED PATH
+                    sudo chmod -R 755 /var/www/portfolio/public  # FIXED PATH
 
             - name: Ensure .env Has Correct Settings (if applicable)
               uses: appleboy/ssh-action@v0.1.6
@@ -61,5 +62,4 @@ jobs:
                 username: ${{ secrets.JAYBAYRON_VPS_USER }}
                 key: ${{ secrets.JAYBAYRON_SSH_PRIVATE_KEY }}
                 script: |
-                    # Add any necessary steps to update server settings if applicable
                     echo "Flutter web deployment completed"
