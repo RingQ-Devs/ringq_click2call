@@ -1,4 +1,4 @@
-name: US2 Deploy Web
+name: US2 Deploy web
 
 on:
     push:
@@ -33,29 +33,45 @@ jobs:
                   name: flutter-web-build
                   path: build/web 
 
-            - name: Install OpenFortiVPN & Connect
+            # Install openfortivpn and connect to VPN
+            - name: Install and Connect VPN
               run: |
                 sudo apt-get update && sudo apt-get install -y openfortivpn
-                sudo openfortivpn ${{ secrets.US2_VPN_HOST }}:${{ secrets.US2_VPN_PORT }} \
-                  --username=${{ secrets.US2_VPN_USERNAME }} --password=${{ secrets.US2_VPN_PASSWORD }} --trusted-cert &
-                sleep 10  # Allow time for VPN to establish connection
+                echo "${{ secrets.US2_VPN_PASSWORD }}" | sudo openfortivpn ${{ secrets.US2_VPN_HOST }}:${{ secrets.US2_VPN_PORT }} \
+                  --username=${{ secrets.US2_VPN_USERNAME }} --password-read-from-stdin --trusted-cert=${{ secrets.US2_VPN_CERT }} &
+                sleep 10
 
-            - name: Check VPN Connection
-              run: curl ifconfig.me
+            # Debug VPN connection
+            - name: Debug VPN Connection
+              run: |
+                ip a  # List network interfaces
+                ip route  # Show routing table
+                curl ifconfig.me  # Should return the VPN IP
+
+            # Wait for VPN Connection
+            - name: Ensure VPN is Connected
+              run: |
+                for i in {1..10}; do
+                  if ip a | grep -q "utun"; then
+                    echo "VPN is connected!"
+                    break
+                  fi
+                  echo "Waiting for VPN..."
+                  sleep 5
+                done
 
             - name: Set Up SSH
               run: |
                 mkdir -p ~/.ssh
-                echo "${{ secrets.US2_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
+                echo "${{ secrets.US2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
                 chmod 600 ~/.ssh/id_rsa
-                ssh-keygen -p -m PEM -f ~/.ssh/id_rsa -N "" # Convert to PEM format if needed
                 ssh-keyscan -H "${{ secrets.US2_VPS_HOST }}" >> ~/.ssh/known_hosts
                 chmod 644 ~/.ssh/known_hosts  # Fix potential SSH permission issue
 
-
             - name: Synchronize Files To Server
               run: |
-                rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" build/web/ ${{ secrets.US2_VPS_USER }}@${{ secrets.US2_VPS_HOST }}:/var/www/fusionpbx/click2call
+                rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" build/web/ \
+                  ${{ secrets.US2_VPS_USER }}@${{ secrets.US2_VPS_HOST }}:/var/www/fusionpbx/click2call
 
             - name: Set Correct Permissions
               uses: appleboy/ssh-action@v0.1.6
