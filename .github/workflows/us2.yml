@@ -33,12 +33,23 @@ jobs:
                   name: flutter-web-build
                   path: build/web 
 
+            # Install openfortivpn and connect to VPN
+            - name: Install openfortivpn & Connect
+              run: |
+                sudo apt-get update && sudo apt-get install -y openfortivpn
+                echo "${{ secrets.US2_VPN_PASSWORD }}" | sudo openfortivpn ${{ secrets.US2_VPN_HOST }}:${{ secrets.US2_VPN_PORT }} \
+                  --username=${{ secrets.US2_VPN_USERNAME }} --password-read-from-stdin --trusted-cert
+
+            # Verify VPN connection
+            - name: Check VPN Connection
+              run: curl ifconfig.me  # Should return the VPN IP
+
             - name: Set Up SSH
               run: |
                 mkdir -p ~/.ssh
                 echo "${{ secrets.US2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
                 chmod 600 ~/.ssh/id_rsa
-                ssh-keyscan -H ${{ secrets.US2_VPS_HOST }} >> ~/.ssh/known_hosts
+                ssh-keyscan -H "${{ secrets.US2_VPS_HOST }}" >> ~/.ssh/known_hosts
                 chmod 644 ~/.ssh/known_hosts  # Fix potential SSH permission issue
 
             - name: Synchronize Files To Server
