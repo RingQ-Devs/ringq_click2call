@@ -1,0 +1,65 @@
+name: Deploy Flutter Web
+
+on:
+    push:
+        branches:
+            - master
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v3
+
+            - name: Upload Build Artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: flutter-web-build
+                  path: build/web/*
+
+    deploy:
+        needs: build
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout Repository
+              uses: actions/checkout@v3
+
+            - name: Download Web Build Artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: flutter-web-build
+                  path: build/web 
+
+            - name: Set Up SSH
+              run: |
+                mkdir -p ~/.ssh
+                echo "${{ secrets.US2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+                chmod 600 ~/.ssh/id_rsa
+                ssh-keyscan -H ${{ secrets.US2_VPS_HOST }} >> ~/.ssh/known_hosts
+                chmod 644 ~/.ssh/known_hosts  # Fix potential SSH permission issue
+
+            - name: Synchronize Files To Server
+              run: |
+                rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" build/web/ ${{ secrets.US2_VPS_USER }}@${{ secrets.US2_VPS_HOST }}:/var/www/fusionpbx/click2call
+
+            - name: Set Correct Permissions
+              uses: appleboy/ssh-action@v0.1.6
+              with:
+                host: ${{ secrets.US2_VPS_HOST }}
+                username: ${{ secrets.US2_VPS_USER }}
+                key: ${{ secrets.US2_SSH_PRIVATE_KEY }}
+                script: |
+                    sudo chown -R www-data:www-data /var/www/fusionpbx/click2call
+                    sudo chmod -R 755 /var/www/fusionpbx/click2call
+
+            - name: Ensure .env Has Correct Settings (if applicable)
+              uses: appleboy/ssh-action@v0.1.6
+              with:
+                host: ${{ secrets.US2_VPS_HOST }}
+                username: ${{ secrets.US2_VPS_USER }}
+                key: ${{ secrets.US2_SSH_PRIVATE_KEY }}
+                script: |
+                    echo "Flutter web deployment completed"
