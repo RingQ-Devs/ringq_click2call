@@ -1,4 +1,4 @@
-name: US2 Deploy web
+name: US2 Deploy Web
 
 on:
     push:
@@ -34,11 +34,12 @@ jobs:
                   path: build/web 
 
             # Install openfortivpn and connect to VPN
-            - name: Install openfortivpn & Connect
+            - name: Install OpenFortiVPN & Connect
               run: |
                 sudo apt-get update && sudo apt-get install -y openfortivpn
-                echo "${{ secrets.US2_VPN_PASSWORD }}" | sudo openfortivpn ${{ secrets.US2_VPN_HOST }}:${{ secrets.US2_VPN_PORT }} \
-                  --username=${{ secrets.US2_VPN_USERNAME }} --password-read-from-stdin --trusted-cert
+                sudo openfortivpn ${{ secrets.US2_VPN_HOST }}:${{ secrets.US2_VPN_PORT }} \
+                  --username=${{ secrets.US2_VPN_USERNAME }} --password=${{ secrets.US2_VPN_PASSWORD }} --trusted-cert &
+                sleep 10  # Allow time for VPN to establish connection
 
             # Verify VPN connection
             - name: Check VPN Connection
