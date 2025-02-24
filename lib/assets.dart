@@ -19,7 +19,7 @@ import 'package:js/js.dart';
 @JS()external void sfInvokeDialerJS(String direction, String phoneNumber, Function callback);
 @JS()external void sfToggleSoftphonePanelJS(bool hidden); 
 @JS()external void sfRunApexGetUserDetailJS(Function callback);
-@JS()external void startCallListener(Function callback);
+@JS()external void sfStartCallListener(Function callback);
 @JS()external void sfSearchRecordJS(String callerNumber, String searchDefaultOrder, String defaultPopupFormAPIName);
 @JS()external void sfNavigateRecord(String navigatePage, String callerNumber);
 
@@ -43,14 +43,14 @@ sfInvokeDialer(String number, String phoneNumber) {
   return completer.future;
 }
 
-class CallListener {
+class CallListener { 
   static final StreamController<String> _callStreamController = StreamController.broadcast();
 
   static Stream<String> get onNewCall => _callStreamController.stream;
 
   static void initialize() {
-    startCallListener(allowInterop((String phoneNumber) {
-      _callStreamController.add(phoneNumber);
+    sfStartCallListener(allowInterop((String data) {
+      _callStreamController.add(data);
     }));
   }
 }
@@ -138,6 +138,7 @@ String balance = '';
 String agentStatus = '';
 String activeProfileStatus = "Available";
 String pinBasedDailing = "1"; 
+String entity = "";
 
 Map session = {};
 Map callProfiles = {};

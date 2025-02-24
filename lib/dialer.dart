@@ -16,7 +16,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class Dialer extends StatefulWidget {
-  const Dialer({ super.key,  }); 
+  const Dialer({ super.key,  });
   @override
   State<Dialer> createState() => _DialerState();
 }
@@ -76,10 +76,19 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     CallListener.initialize();
     CallListener.onNewCall.listen((payload) async {
       var res = json.decode(payload);
+      prettyLog(res); 
+      
       sfNavigateRecord(res['objectType'], res['number']);
-      setState(() => destination = res['number']); 
-       _performCall(context, true);
-       sfToggleSoftphonePanelJS(true);
+      setState(() {
+        destination = res['number'];
+        entity = res['objectType'];
+      });
+      _performCall(context, true);
+
+      await Future.delayed(const Duration(seconds: 1));
+
+      _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound', objectType: entity);
+      sfToggleSoftphonePanelJS(true);
     }); 
   }
 
@@ -97,16 +106,16 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
             prioritySfForm = res['content']['form'];
           });
 
-          prettyLog(res['content']);
+          // prettyLog(res['content']);
         }
       } else {
         print('Failed to send POST request. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      prettyLog({
-        'post': '/register/calllog',
-        'error': e
-      });
+      // prettyLog({
+      //   'post': '/register/calllog',
+      //   'error': e
+      // });
     }
   }
 
@@ -126,38 +135,39 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
       sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''));
       callDirections?.answer(sipUAHelper.buildCallOptions(!false), mediaStream: mediaStream);
       _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound');
-      prettyLog({
-        'prioritySfForm': prioritySfForm
-      }); 
+      // prettyLog({
+      //   'prioritySfForm': prioritySfForm
+      // }); 
     }
     _player.stop();
   }
 
-  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String callDirection) async { 
+  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String callDirection, {String objectType = ''}) async { 
     http.Response response;
     try {
       // String trimmedQueueNumber = callerDestination.replaceAll("(", "").replaceAll(")", "");
       response = await http.get(
-        Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ callDirection), 
+        Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ callDirection +"/"+ objectType), 
       );
       if (response.statusCode == 200) {
-        Map content = json.decode(response.body);
-        prettyLog({
-          "username": sipUsername,
-          "number": callerNumber,
-          "trimmedQueueNumber": callerDestination
-        });
+        Map content = json.decode(response.body); 
 
-        prettyLog(content);
+        // prettyLog({
+        //   "username": sipUsername,
+        //   "number": callerNumber,
+        //   "trimmedQueueNumber": callerDestination
+        // });
+
+        // prettyLog(content);
       } else {
-        prettyLog({
-          'error'
-        });
+        // prettyLog({
+        //   'error'
+        // });
       }
     } catch (e) {
-      prettyLog({
-        '_registerCallGet error:': e
-      });
+      // prettyLog({
+      //   '_registerCallGet error:': e
+      // });
     }
   }
 
@@ -666,10 +676,10 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   @override
   void callStateChanged(Call call, CallState callState) async {
-    prettyLog({
-      'file': 'dialer.dart',
-      'callState.state': callState.state.toString()
-    });
+    // prettyLog({
+    //   'file': 'dialer.dart',
+    //   'callState.state': callState.state.toString()
+    // });
 
     if (callState.state == CallStateEnum.HOLD || callState.state == CallStateEnum.UNHOLD) {
       _holdCall = callState.state == CallStateEnum.HOLD;
@@ -737,8 +747,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         setState(() => _answered = true);
         _stopWatchTimer.onResetTimer();
         _stopWatchTimer.onStartTimer();
-        _player.stop(); 
-        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound');
+        _player.stop();
         break;
       case CallStateEnum.CONFIRMED:
         break;
@@ -779,7 +788,8 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         _localStream?.getTracks().forEach((track) {
           track.stop();
         });
-        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'misscall');
+        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'misscall', objectType: entity);
+        setState(() { entity = ''; });
         break;
       default:
     }
@@ -787,11 +797,11 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   @override
   void registrationStateChanged(RegistrationState state) async {
-    prettyLog({
-      'file': 'dialer.dart',
-      'method': 'registrationStateChanged',
-      'state': state.state.toString(), 
-    });
+    // prettyLog({
+    //   'file': 'dialer.dart',
+    //   'method': 'registrationStateChanged',
+    //   'state': state.state.toString(), 
+    // });
 
     _player.play(
       UrlSource('https://$ringqServer:8443/audio/ringtone2.mp3'), 
@@ -806,20 +816,20 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   @override
   void transportStateChanged(TransportState state) {
-    prettyLog({
-      'file': 'dialer.dart',
-      'method': 'transportStateChanged',
-      'state': state.toString()
-    });
+    // prettyLog({
+    //   'file': 'dialer.dart',
+    //   'method': 'transportStateChanged',
+    //   'state': state.toString()
+    // });
   }
 
   @override
   void onNewReinvite(ReInvite event) {
-    prettyLog({
-      'file': 'dialer.dart',
-      'method': 'onNewReinvite',
-      'event': event.toString()
-    });
+    // prettyLog({
+    //   'file': 'dialer.dart',
+    //   'method': 'onNewReinvite',
+    //   'event': event.toString()
+    // });
   }
 
   void _disposeRenderers() {

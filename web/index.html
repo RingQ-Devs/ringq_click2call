@@ -49,18 +49,6 @@
       });
     }
 
-    function sfNewContactJS(phone) {
-      sforce.opencti.screenPop({
-        type: sforce.opencti.SCREENPOP_TYPE.NEW_RECORD_MODAL,
-        params: {
-          entityName: "Contact",
-          defaultFieldValues: {
-            Phone: phone
-          }
-        }
-      })
-    }
-
     function sfPopupFormJS(entityName, callback) {
       sforce.opencti.screenPop({
         type: sforce.opencti.SCREENPOP_TYPE.NEW_RECORD_MODAL,
@@ -71,7 +59,7 @@
       })
     }
 
-    function startCallListener(dartCallback) {
+    function sfStartCallListener(dartCallback) {
       sforce.opencti.onClickToDial({
         listener: function(payload) { 
           if (payload && payload.number) {
@@ -108,44 +96,9 @@
     function sfToggleSoftphonePanelJS(visible) {
       sforce.opencti.setSoftphonePanelVisibility({
         visible: visible,
-        callback: function(response) {
-          if (response.success) {
-            console.log('Softphone panel visibility set to', visible);
-          } else {
-            console.error('Failed to set Softphone panel visibility:', response.errors);
-          }
-        }
+        callback: function(response) {}
       });
-    }
-
-    function navigateToRecord(record) {
-      const recordUrl = `/lightning/r/${record}/view`;
-
-      sforce.opencti.navigateToUrl({
-        url: recordUrl,
-        callback: function(response) {
-          if (response.success) {
-            console.log('Navigation successful to record:', record);
-          } else {
-            console.error('Failed to navigate to record:', response.errors);
-          }
-        }
-      });
-    }
-
-    var callback = function(response) {
-      if (response.success) {
-        checkSoftphonePanelVisibility()
-          .then(isVisible => {
-            if (isVisible) sfToggleSoftphonePanelJS(true);
-          })
-          .catch(error => {
-            console.error("Error checking visibility callback:", error);
-          });
-      } else {
-        console.error('Something went wrong! Errors:', response.errors);
-      }
-    };
+    } 
 
     function sfSearchRecordJS(callerNumber, searchDefaultOrder, defaultPopupFormAPIName) {
       sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
@@ -224,7 +177,21 @@
         });
       });
     }
- 
+
+    var callback = function(response) {
+      if (response.success) {
+        checkSoftphonePanelVisibility()
+          .then(isVisible => {
+            if (isVisible) sfToggleSoftphonePanelJS(true);
+          })
+          .catch(error => {
+            console.error("Error checking visibility callback:", error);
+          });
+      } else {
+        console.error('Something went wrong! Errors:', response.errors);
+      }
+    };
+
     var listener = function(payload) {};
  
     sforce.opencti.getAppViewInfo({ callback: callback });

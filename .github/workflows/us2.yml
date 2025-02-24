@@ -1,93 +1,93 @@
-name: US2 Deploy web
+# name: US2 Deploy web
 
-on:
-    push:
-        branches:
-            - master
+# on:
+#     push:
+#         branches:
+#             - master
 
-jobs:
-    build:
-        runs-on: ubuntu-latest
+# jobs:
+#     build:
+#         runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v3
+#         steps:
+#             - name: Checkout Repository
+#               uses: actions/checkout@v3
 
-            - name: Upload Build Artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: flutter-web-build
-                  path: build/web/*
+#             - name: Upload Build Artifact
+#               uses: actions/upload-artifact@v4
+#               with:
+#                   name: flutter-web-build
+#                   path: build/web/*
 
-    deploy:
-        needs: build
-        runs-on: ubuntu-latest
+#     deploy:
+#         needs: build
+#         runs-on: ubuntu-latest
 
-        steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v3
+#         steps:
+#             - name: Checkout Repository
+#               uses: actions/checkout@v3
 
-            - name: Download Web Build Artifact
-              uses: actions/download-artifact@v4
-              with:
-                  name: flutter-web-build
-                  path: build/web 
+#             - name: Download Web Build Artifact
+#               uses: actions/download-artifact@v4
+#               with:
+#                   name: flutter-web-build
+#                   path: build/web 
 
-            # Install openfortivpn and connect to VPN
-            - name: Install and Connect VPN
-              run: |
-                sudo apt-get update && sudo apt-get install -y openfortivpn
-                echo "${{ secrets.US2_VPN_PASSWORD }}" | sudo openfortivpn ${{ secrets.US2_VPN_HOST }}:${{ secrets.US2_VPN_PORT }} \
-                  --username=${{ secrets.US2_VPN_USERNAME }} --password-read-from-stdin --trusted-cert=${{ secrets.US2_VPN_CERT }} &
-                sleep 10
+#             # Install openfortivpn and connect to VPN
+#             - name: Install and Connect VPN
+#               run: |
+#                 sudo apt-get update && sudo apt-get install -y openfortivpn
+#                 echo "${{ secrets.US2_VPN_PASSWORD }}" | sudo openfortivpn ${{ secrets.US2_VPN_HOST }}:${{ secrets.US2_VPN_PORT }} \
+#                   --username=${{ secrets.US2_VPN_USERNAME }} --password-read-from-stdin --trusted-cert=${{ secrets.US2_VPN_CERT }} &
+#                 sleep 10
 
-            # Debug VPN connection
-            - name: Debug VPN Connection
-              run: |
-                ip a  # List network interfaces
-                ip route  # Show routing table
-                curl ifconfig.me  # Should return the VPN IP
+#             # Debug VPN connection
+#             - name: Debug VPN Connection
+#               run: |
+#                 ip a  # List network interfaces
+#                 ip route  # Show routing table
+#                 curl ifconfig.me  # Should return the VPN IP
 
-            # Wait for VPN Connection
-            - name: Ensure VPN is Connected
-              run: |
-                for i in {1..10}; do
-                  if ip a | grep -q "utun"; then
-                    echo "VPN is connected!"
-                    break
-                  fi
-                  echo "Waiting for VPN..."
-                  sleep 5
-                done
+#             # Wait for VPN Connection
+#             - name: Ensure VPN is Connected
+#               run: |
+#                 for i in {1..10}; do
+#                   if ip a | grep -q "utun"; then
+#                     echo "VPN is connected!"
+#                     break
+#                   fi
+#                   echo "Waiting for VPN..."
+#                   sleep 5
+#                 done
 
-            - name: Set Up SSH
-              run: |
-                mkdir -p ~/.ssh
-                echo "${{ secrets.US2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-                chmod 600 ~/.ssh/id_rsa
-                ssh-keyscan -H "${{ secrets.US2_VPS_HOST }}" >> ~/.ssh/known_hosts
-                chmod 644 ~/.ssh/known_hosts  # Fix potential SSH permission issue
+#             - name: Set Up SSH
+#               run: |
+#                 mkdir -p ~/.ssh
+#                 echo "${{ secrets.US2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+#                 chmod 600 ~/.ssh/id_rsa
+#                 ssh-keyscan -H "${{ secrets.US2_VPS_HOST }}" >> ~/.ssh/known_hosts
+#                 chmod 644 ~/.ssh/known_hosts
 
-            - name: Synchronize Files To Server
-              run: |
-                rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" build/web/ \
-                  ${{ secrets.US2_VPS_USER }}@${{ secrets.US2_VPS_HOST }}:/var/www/fusionpbx/click2call
+#             - name: Synchronize Files To Server
+#               run: |
+#                 rsync -avz --delete -e "ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no" build/web/ \
+#                   ${{ secrets.US2_VPS_USER }}@${{ secrets.US2_VPS_HOST }}:/var/www/fusionpbx/click2call
 
-            - name: Set Correct Permissions
-              uses: appleboy/ssh-action@v0.1.6
-              with:
-                host: ${{ secrets.US2_VPS_HOST }}
-                username: ${{ secrets.US2_VPS_USER }}
-                key: ${{ secrets.US2_SSH_PRIVATE_KEY }}
-                script: |
-                    sudo chown -R www-data:www-data /var/www/fusionpbx/click2call
-                    sudo chmod -R 755 /var/www/fusionpbx/click2call
+#             - name: Set Correct Permissions
+#               uses: appleboy/ssh-action@v0.1.6
+#               with:
+#                 host: ${{ secrets.US2_VPS_HOST }}
+#                 username: ${{ secrets.US2_VPS_USER }}
+#                 key: ${{ secrets.US2_SSH_PRIVATE_KEY }}
+#                 script: |
+#                     sudo chown -R www-data:www-data /var/www/fusionpbx/click2call
+#                     sudo chmod -R 755 /var/www/fusionpbx/click2call
 
-            - name: Ensure .env Has Correct Settings (if applicable)
-              uses: appleboy/ssh-action@v0.1.6
-              with:
-                host: ${{ secrets.US2_VPS_HOST }}
-                username: ${{ secrets.US2_VPS_USER }}
-                key: ${{ secrets.US2_SSH_PRIVATE_KEY }}
-                script: |
-                    echo "Flutter web deployment completed"
+#             - name: Ensure .env Has Correct Settings (if applicable)
+#               uses: appleboy/ssh-action@v0.1.6
+#               with:
+#                 host: ${{ secrets.US2_VPS_HOST }}
+#                 username: ${{ secrets.US2_VPS_USER }}
+#                 key: ${{ secrets.US2_SSH_PRIVATE_KEY }}
+#                 script: |
+#                     echo "Flutter web deployment completed"
