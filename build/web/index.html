@@ -110,16 +110,17 @@
     function sfSearchRecordJS(callerNumber, searchDefaultOrder, defaultPopupFormAPIName, callback = null) { 
       let objectType = '';
       sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
-        sfTotalRecords(callerNumber, domain, function(totalRecords) {
-          if (totalRecords > 1) {
-            globalSearch(callerNumber);
-            return;
-          }
+        // sfTotalRecords(callerNumber, domain, function(totalRecords) {
+          // if (totalRecords > 1) {
+            // globalSearch(callerNumber);
+            // if (callback) callback(objectType);
+            // return;
+          // }
 
           let found = false;
           
           const removePlural = item => {
-            const singularMap = { Contacts: "Contact", Leads: "Lead", Accounts: "Account" };
+            const singularMap = { Contacts: "Contact", Accounts: "Account" };
             return singularMap[item] || item;
           };
       
@@ -173,9 +174,9 @@
           }
       
           searchNext(0);
-        });
+        // });
       });
-    } 
+    }
 
     function sfTotalRecords(callerNumber, domain, callback) {
       let totalRecordsFound = 0;

@@ -49,8 +49,10 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   _initializeCallFlow() async {
     var resultUserDetail = await getSfUserDetail();
     var userDetail = json.decode(resultUserDetail);
+    prettyLog(userDetail);
 
     setState(() {
+      sfUserId = userDetail['Id'];
       extentionNo = userDetail['SIP_Extension__c'];
       username = userDetail['SIP_Username__c'];
       password = userDetail['SIP_Password__c'];
@@ -77,12 +79,13 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     CallListener.initialize();
     CallListener.onNewCall.listen((payload) async {
       var res = json.decode(payload);
-      prettyLog(res); 
+      prettyLog(res);
       
       sfNavigateRecord(res['objectType'], res['number']);
       setState(() {
         destination = res['number'];
         entity = res['objectType'];
+        sfUserId = res['Id'];
       });
       _performCall(context, true);
 
@@ -133,17 +136,28 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     if (callDirections != null) {
       await _existContact(username, callDirections!.remote_identity!); 
       callDirections?.answer(sipUAHelper.buildCallOptions(!false), mediaStream: mediaStream);
+      debugPrint("<!-- THIS IS ACCEP 1");
       sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
+        debugPrint("<!-- THIS IS ACCEP 2");
         _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound', objectType: attributeType);
       }));
     }
     _player.stop();
   }
 
-  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String callDirection, {String objectType = ''}) async { 
-      await http.get(
-        Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ callDirection +"/"+ objectType), 
-      );
+  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String callDirection, {String objectType = ''}) async {
+    prettyLog({
+      'sipUsername': sipUsername,
+      'callerNumber': callerNumber,
+      'callerDestination': callerDestination,
+      'callDirection': callDirection,
+      'objectType': objectType,
+      'userId': sfUserId,
+    });
+
+    await http.get(
+      Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ callDirection +"/"+ objectType +"/"+ sfUserId,), 
+    ); 
   }
 
   _existContact(String username, String callerNumber) async {
@@ -789,7 +803,9 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         _player.stop(); 
         _localStream?.getTracks().forEach((track) {
           track.stop();
-        }); 
+        });
+        await Future.delayed(const Duration(seconds: 1));
+        prettyLog('Faileedd');
         _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'misscall', objectType: entity);
         setState(() { entity = ''; });
         break;
