@@ -5,7 +5,8 @@ import 'package:avatar_glow/avatar_glow.dart';
 import 'package:carbon_icons/carbon_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart'; 
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:js/js.dart'; 
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'assets.dart'; 
@@ -89,10 +90,10 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
       _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound', objectType: entity);
       sfToggleSoftphonePanelJS(true);
-    }); 
+    });
   }
 
-  _getSearchOrder(hostServer) async { 
+  _getSearchOrder(hostServer) async {
     try {
       final response = await http.post(Uri.parse('https://$hostServer:8443/register/calllog'), 
         body: {'dialer_name': "$username@$extentionNo"},
@@ -105,8 +106,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
             prioritySfSearchOrder = res['content']['priority'];
             prioritySfForm = res['content']['form'];
           });
-
-          // prettyLog(res['content']);
         }
       } else {
         print('Failed to send POST request. Status code: ${response.statusCode}');
@@ -132,42 +131,39 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     final mediaConstraints = <String, dynamic>{'audio': true, 'video': false};
     mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
     if (callDirections != null) {
-      sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''));
+      await _existContact(username, callDirections!.remote_identity!); 
       callDirections?.answer(sipUAHelper.buildCallOptions(!false), mediaStream: mediaStream);
-      _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound');
-      // prettyLog({
-      //   'prioritySfForm': prioritySfForm
-      // }); 
+      sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
+        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound', objectType: attributeType);
+      }));
     }
     _player.stop();
   }
 
   _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String callDirection, {String objectType = ''}) async { 
-    http.Response response;
-    try {
-      // String trimmedQueueNumber = callerDestination.replaceAll("(", "").replaceAll(")", "");
-      response = await http.get(
+      await http.get(
         Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ callDirection +"/"+ objectType), 
       );
+  }
+
+  _existContact(String username, String callerNumber) async {
+    try {
+      final response = await http.get(
+        Uri.parse("https://$ringqServer:8443/register/calllog/2/"+ username + "/"+ callerNumber), 
+      );
       if (response.statusCode == 200) {
-        Map content = json.decode(response.body); 
-
-        // prettyLog({
-        //   "username": sipUsername,
-        //   "number": callerNumber,
-        //   "trimmedQueueNumber": callerDestination
-        // });
-
-        // prettyLog(content);
+        var res = json.decode(response.body);
+        prettyLog(res);
+        return '';
       } else {
-        // prettyLog({
-        //   'error'
-        // });
+        print('Failed to send POST request. Status code: ${response.statusCode}');
+        return '';
       }
     } catch (e) {
-      // prettyLog({
-      //   '_registerCallGet error:': e
-      // });
+      prettyLog({
+        '_existContact error:': e
+      });
+      return '';
     }
   }
 
@@ -427,9 +423,14 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                           child: CircleAvatar(
                             backgroundColor: primaryColor2, 
                             child: IconButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 if (destination.isNotEmpty) {
                                   _performCall(context, true);
+                                  _existContact(username, destination);
+                                  await Future.delayed(const Duration(seconds: 3));
+                                  sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
+                                    _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound', objectType: attributeType);
+                                  }));
                                 }
                               }, 
                               color: primaryColor,
@@ -531,7 +532,13 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                         backgroundColor: redColor,
                         radius: headerSize * 1.8,
                         child: IconButton(
-                          onPressed: _performHangup,
+                          onPressed: () {
+                            sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
+                              _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound', objectType: attributeType);
+                            }));
+
+                            _performHangup();
+                          },
                           iconSize: headerSize * 1.8,
                           color: redColor,
                           icon: Icon(
@@ -676,11 +683,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   @override
   void callStateChanged(Call call, CallState callState) async {
-    // prettyLog({
-    //   'file': 'dialer.dart',
-    //   'callState.state': callState.state.toString()
-    // });
-
     if (callState.state == CallStateEnum.HOLD || callState.state == CallStateEnum.UNHOLD) {
       _holdCall = callState.state == CallStateEnum.HOLD;
       setState(() {});
@@ -787,7 +789,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         _player.stop(); 
         _localStream?.getTracks().forEach((track) {
           track.stop();
-        });
+        }); 
         _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'misscall', objectType: entity);
         setState(() { entity = ''; });
         break;
@@ -797,12 +799,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   @override
   void registrationStateChanged(RegistrationState state) async {
-    // prettyLog({
-    //   'file': 'dialer.dart',
-    //   'method': 'registrationStateChanged',
-    //   'state': state.state.toString(), 
-    // });
-
     _player.play(
       UrlSource('https://$ringqServer:8443/audio/ringtone2.mp3'), 
       mode: PlayerMode.lowLatency,
@@ -815,22 +811,10 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   }
 
   @override
-  void transportStateChanged(TransportState state) {
-    // prettyLog({
-    //   'file': 'dialer.dart',
-    //   'method': 'transportStateChanged',
-    //   'state': state.toString()
-    // });
-  }
+  void transportStateChanged(TransportState state) {}
 
   @override
-  void onNewReinvite(ReInvite event) {
-    // prettyLog({
-    //   'file': 'dialer.dart',
-    //   'method': 'onNewReinvite',
-    //   'event': event.toString()
-    // });
-  }
+  void onNewReinvite(ReInvite event) {}
 
   void _disposeRenderers() {
     if (_localRenderer != null) {

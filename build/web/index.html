@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"> 
+  <title>RingQ Dialer</title>
+
+  <script src="https://ringq-dev-ed.develop.lightning.force.com/support/api/62.0/lightning/opencti_min.js" type="application/javascript"></script>
+
+  <script type="text/javascript"> 
+    function globalSearch(searchString) {
+      sforce.opencti.screenPop({
+        type: sforce.opencti.SCREENPOP_TYPE.SEARCH,
+        params: { searchString: searchString }
+      });
+    }
+
+    function sfRunApexGetUserDetailJS(callback) {
+      sforce.opencti.runApex({
+        apexClass: 'RingQ',
+        methodName: 'getUserDetail',
+        methodParams: '{}',
+        callback: function(result) {
+          callback(result.success ? result.returnValue.runApex : result);
+        }
+      });
+    }
+
+    function sfRunApexJS(apexMethod, methodParam, callback) {
+      sforce.opencti.runApex({
+        apexClass: 'RingQ',
+        methodName: apexMethod,
+        methodParams: methodParam,
+        callback: function(result) { 
+          callback(result.success ? result.returnValue.runApex : result);
+        }
+      });
+    }
+
+    function sfInvokeDialerJS(direction, phoneNumber, callback) {
+      let _direction = null;
+      if (direction == 'inbound') _direction = sforce.opencti.CALL_TYPE.INBOUND;
+      if (direction == 'outbound') _direction = sforce.opencti.CALL_TYPE.OUTBOUND;
+      if (direction == 'internal') _direction = sforce.opencti.CALL_TYPE.INTERNAL;
+
+      sforce.opencti.searchAndScreenPop({
+        searchParams: phoneNumber,
+        callType: _direction, 
+        deferred: false,
+        callback: function(result) {
+          try {
+            callback(JSON.stringify(result));  
+          } catch (e) {
+            callback('{"error": "Failed to serialize result"}'); 
+          }
+        }
+      });
+    }
+
+    function sfPopupFormJS(entityName, callback) {
+      sforce.opencti.screenPop({
+        type: sforce.opencti.SCREENPOP_TYPE.NEW_RECORD_MODAL,
+        params: {
+          entityName: entityName,
+          defaultFieldValues: callback(entityName)
+        }
+      })
+    }
+
+    function sfStartCallListener(dartCallback) {
+      sforce.opencti.onClickToDial({
+        listener: function(payload) { 
+          if (payload && payload.number) {
+            var data = JSON.stringify(payload);
+            dartCallback(data);
+          }
+        }
+      });
+    }
+
+    function sfNavigateJS(url) {
+      sforce.opencti.screenPop({
+          type: sforce.opencti.SCREENPOP_TYPE.URL,
+          params: {
+              url: url
+          }
+      });
+    }
+
+    function checkSoftphonePanelVisibility() {
+      return new Promise((resolve, reject) => {
+        sforce.opencti.isSoftphonePanelVisible({
+          callback: function(response) {
+            if (response.success) {
+              resolve(response.returnValue);
+            } else {
+              reject('Failed to check softphone panel visibility');
+            }
+          }
+        });
+      });
+    }
+
+    function sfToggleSoftphonePanelJS(visible) {
+      sforce.opencti.setSoftphonePanelVisibility({
+        visible: visible,
+        callback: function(response) {}
+      });
+    } 
+
+    function sfSearchRecordJS(callerNumber, searchDefaultOrder, defaultPopupFormAPIName, callback = null) { 
+      let objectType = '';
+      sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
+        sfTotalRecords(callerNumber, domain, function(totalRecords) {
+          if (totalRecords > 1) {
+            globalSearch(callerNumber);
+            return;
+          }
+
+          let found = false;
+          
+          const removePlural = item => {
+            const singularMap = { Contacts: "Contact", Leads: "Lead", Accounts: "Account" };
+            return singularMap[item] || item;
+          };
+      
+          const searchOrder = searchDefaultOrder
+            .split('/')
+            .map(item => removePlural(item.trim()));
+      
+          function searchNext(index) {
+            if (index >= searchOrder.length || found) {
+              if (!found) {
+                sfPopupFormJS(defaultPopupFormAPIName, function(apiName) {
+                  switch (apiName) {
+                    case 'Contact':
+                      return { Phone: callerNumber, FirstName: '', LastName: '', Email: '' };
+                    case 'Lead':
+                      return { Phone: callerNumber };
+                    default:
+                      return { Phone: callerNumber };
+                  }
+                });
+              }
+              if (callback) callback(objectType);
+              return;
+            }
+      
+            const currentSearch = searchOrder[index];
+      
+            let searchMethodName = '';
+            if (currentSearch === 'Contact') {
+              searchMethodName = 'findContactDetail';
+            } else if (currentSearch === 'Lead') {
+              searchMethodName = 'findLeadsDetail';
+            } else if (currentSearch === 'Account') {
+              searchMethodName = 'findAccountDetail';
+            }
+      
+            sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, (data) => {
+              const result = JSON.parse(data);
+              if (result && Object.keys(result).length !== 0) {
+                sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`);
+                objectType = result.attributes.type;
+                found = true;
+              }
+      
+              if (!found) {
+                searchNext(index + 1);
+              } else {
+                if (callback) callback(objectType);
+              }
+            });
+          }
+      
+          searchNext(0);
+        });
+      });
+    } 
+
+    function sfTotalRecords(callerNumber, domain, callback) {
+      let totalRecordsFound = 0;
+  
+      const searchTypes = [
+        { type: 'Contact', searchMethod: 'findContactDetail' },
+        { type: 'Lead', searchMethod: 'findLeadsDetail' },
+        { type: 'Account', searchMethod: 'findAccountDetail' }
+      ];
+  
+      function searchNext(index) {
+        if (index >= searchTypes.length) {
+          if (callback) callback(totalRecordsFound);
+          return;
+        }
+  
+        const currentSearch = searchTypes[index];
+  
+        sfRunApexJS(currentSearch.searchMethod, `phoneNumber=${callerNumber}`, (data) => {
+          const result = JSON.parse(data);
+          if (result && Object.keys(result).length !== 0) {
+            const recordCount = Object.keys(result).length; 
+            totalRecordsFound += recordCount;
+          }
+  
+          searchNext(index + 1);
+        });
+      }
+  
+      searchNext(0);
+    }
+
+    function sfNavigateRecord(navigatePage, callerNumber) {
+      let searchMethodName = '';
+      if (navigatePage === 'Contact') {
+        searchMethodName = 'findContactDetail';
+      } else if (navigatePage === 'Lead') {
+        searchMethodName = 'findLeadsDetail';
+      } else if (navigatePage === 'Account') {
+        searchMethodName = 'findAccountDetail';
+      }
+
+      sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
+        sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, (data) => {
+          const result = JSON.parse(data);
+          if (result && Object.keys(result).length !== 0) {
+            sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`);
+          }
+        });
+      });
+    }
+
+    var callback = function(response) {
+      if (response.success) {
+        checkSoftphonePanelVisibility()
+          .then(isVisible => {
+            if (isVisible) sfToggleSoftphonePanelJS(true);
+          })
+          .catch(error => {
+            console.error("Error checking visibility callback:", error);
+          });
+      } else {
+        console.error('Something went wrong! Errors:', response.errors);
+      }
+    };
+
+    var listener = function(payload) {};
+ 
+    sforce.opencti.getAppViewInfo({ callback: callback });
+    sforce.opencti.enableClickToDial({ callback: callback });
+    sforce.opencti.onClickToDial({ listener: listener });
+  </script>
+</head>
+<body>
+  <script src="main.dart.js" type="application/javascript"></script>
+</body>
+</html>

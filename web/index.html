@@ -6,7 +6,14 @@
 
   <script src="https://ringq-dev-ed.develop.lightning.force.com/support/api/62.0/lightning/opencti_min.js" type="application/javascript"></script>
 
-  <script type="text/javascript">
+  <script type="text/javascript"> 
+    function globalSearch(searchString) {
+      sforce.opencti.screenPop({
+        type: sforce.opencti.SCREENPOP_TYPE.SEARCH,
+        params: { searchString: searchString }
+      });
+    }
+
     function sfRunApexGetUserDetailJS(callback) {
       sforce.opencti.runApex({
         apexClass: 'RingQ',
@@ -100,62 +107,105 @@
       });
     } 
 
-    function sfSearchRecordJS(callerNumber, searchDefaultOrder, defaultPopupFormAPIName) {
+    function sfSearchRecordJS(callerNumber, searchDefaultOrder, defaultPopupFormAPIName, callback = null) { 
+      let objectType = '';
       sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
-        let found = false;
-
-        const searchOrder = searchDefaultOrder.split('/').map(item => item.trim());
-
-        function searchNext(index) {
-          if (index >= searchOrder.length || found) {
-            if (!found) {
-              sfPopupFormJS(defaultPopupFormAPIName, function(apiName) {
-                switch (apiName) {
-                  case 'Contact':
-                    return {
-                      Phone: callerNumber
-                    };
-                  case 'Lead':
-                    return {
-                      Phone: callerNumber
-                    };
-                  default: // Account
-                    return {
-                      Phone: callerNumber
-                    };
-                }
-              });
-            }
+        sfTotalRecords(callerNumber, domain, function(totalRecords) {
+          if (totalRecords > 1) {
+            globalSearch(callerNumber);
             return;
           }
 
-          const currentSearch = searchOrder[index];
-
-          let searchMethodName = '';
-          if (currentSearch === 'Contacts') {
-            searchMethodName = 'findContactDetail';
-          } else if (currentSearch === 'Leads') {
-            searchMethodName = 'findLeadsDetail';
-          } else if (currentSearch === 'Accounts') {
-            searchMethodName = 'findAccountDetail';
+          let found = false;
+          
+          const removePlural = item => {
+            const singularMap = { Contacts: "Contact", Leads: "Lead", Accounts: "Account" };
+            return singularMap[item] || item;
+          };
+      
+          const searchOrder = searchDefaultOrder
+            .split('/')
+            .map(item => removePlural(item.trim()));
+      
+          function searchNext(index) {
+            if (index >= searchOrder.length || found) {
+              if (!found) {
+                sfPopupFormJS(defaultPopupFormAPIName, function(apiName) {
+                  switch (apiName) {
+                    case 'Contact':
+                      return { Phone: callerNumber, FirstName: '', LastName: '', Email: '' };
+                    case 'Lead':
+                      return { Phone: callerNumber };
+                    default:
+                      return { Phone: callerNumber };
+                  }
+                });
+              }
+              if (callback) callback(objectType);
+              return;
+            }
+      
+            const currentSearch = searchOrder[index];
+      
+            let searchMethodName = '';
+            if (currentSearch === 'Contact') {
+              searchMethodName = 'findContactDetail';
+            } else if (currentSearch === 'Lead') {
+              searchMethodName = 'findLeadsDetail';
+            } else if (currentSearch === 'Account') {
+              searchMethodName = 'findAccountDetail';
+            }
+      
+            sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, (data) => {
+              const result = JSON.parse(data);
+              if (result && Object.keys(result).length !== 0) {
+                sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`);
+                objectType = result.attributes.type;
+                found = true;
+              }
+      
+              if (!found) {
+                searchNext(index + 1);
+              } else {
+                if (callback) callback(objectType);
+              }
+            });
           }
-
-          sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, (data) => {
-            console.log('searchMethodName', data);
-            const result = JSON.parse(data);
-            if (result && Object.keys(result).length !== 0) {
-              sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`);
-              found = true;
-            }
-
-            if (!found) {
-              searchNext(index + 1);
-            }
-          });
-        }
-
-        searchNext(0);
+      
+          searchNext(0);
+        });
       });
+    } 
+
+    function sfTotalRecords(callerNumber, domain, callback) {
+      let totalRecordsFound = 0;
+  
+      const searchTypes = [
+        { type: 'Contact', searchMethod: 'findContactDetail' },
+        { type: 'Lead', searchMethod: 'findLeadsDetail' },
+        { type: 'Account', searchMethod: 'findAccountDetail' }
+      ];
+  
+      function searchNext(index) {
+        if (index >= searchTypes.length) {
+          if (callback) callback(totalRecordsFound);
+          return;
+        }
+  
+        const currentSearch = searchTypes[index];
+  
+        sfRunApexJS(currentSearch.searchMethod, `phoneNumber=${callerNumber}`, (data) => {
+          const result = JSON.parse(data);
+          if (result && Object.keys(result).length !== 0) {
+            const recordCount = Object.keys(result).length; 
+            totalRecordsFound += recordCount;
+          }
+  
+          searchNext(index + 1);
+        });
+      }
+  
+      searchNext(0);
     }
 
     function sfNavigateRecord(navigatePage, callerNumber) {
