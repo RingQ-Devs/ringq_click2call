@@ -119,8 +119,7 @@ void playBeepSound() async {
 String ringqServer = '';
 String username = ''; 
 String password = ''; 
-String extentionNo = '';
-String sfUserId = '';
+String extentionNo = ''; 
 String destination = '';
 String destinationName = '';
 String prioritySfSearchOrder = '';

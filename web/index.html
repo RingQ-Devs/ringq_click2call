@@ -128,19 +128,22 @@
             .split('/')
             .map(item => removePlural(item.trim()));
       
-          function searchNext(index) {
+            async function searchNext(index)  {
             if (index >= searchOrder.length || found) {
               if (!found) {
-                sfPopupFormJS(defaultPopupFormAPIName, function(apiName) {
-                  switch (apiName) {
-                    case 'Contact':
-                      return { Phone: callerNumber, FirstName: '', LastName: '', Email: '' };
-                    case 'Lead':
-                      return { Phone: callerNumber };
-                    default:
-                      return { Phone: callerNumber };
-                  }
-                });
+                await globalSearch(callerNumber);
+                setTimeout(function() {
+                  sfPopupFormJS(defaultPopupFormAPIName, function(apiName) {
+                    switch (apiName) {
+                      case 'Contact':
+                        return { Phone: callerNumber, FirstName: '', LastName: '', Email: '' };
+                      case 'Lead':
+                        return { Phone: callerNumber };
+                      default:
+                        return { Phone: callerNumber };
+                    }
+                  });
+                }, 5000)
               }
               if (callback) callback(objectType);
               return;

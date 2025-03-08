@@ -35,6 +35,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   bool _muteCall = false;
   bool _answered = false;
   bool _declined = false;
+  String sfUserId = '';
   final AudioPlayer _player = AudioPlayer();
   final SIPUAHelper sipUAHelper = SIPUAHelper();
   final StopWatchTimer _stopWatchTimer = StopWatchTimer(); 
@@ -48,8 +49,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   _initializeCallFlow() async {
     var resultUserDetail = await getSfUserDetail();
-    var userDetail = json.decode(resultUserDetail);
-    prettyLog(userDetail);
+    var userDetail = json.decode(resultUserDetail); 
 
     setState(() {
       sfUserId = userDetail['Id'];
@@ -114,10 +114,10 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         print('Failed to send POST request. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      // prettyLog({
-      //   'post': '/register/calllog',
-      //   'error': e
-      // });
+      prettyLog({
+        'post': '/register/calllog',
+        'error': e
+      });
     }
   }
 
@@ -132,7 +132,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     debugPrint("<!-- THIS IS ACCEPT");
     await _existContact(username, callDirections!.remote_identity!);
     sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
-      _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound', objectType: attributeType);
+      _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'answer', objectType: attributeType);
     }));
     MediaStream mediaStream;
     final mediaConstraints = <String, dynamic>{'audio': true, 'video': false};
@@ -143,18 +143,9 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     _player.stop();
   }
 
-  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String callDirection, {String objectType = ''}) async {
-    prettyLog({
-      'sipUsername': sipUsername,
-      'callerNumber': callerNumber,
-      'callerDestination': callerDestination,
-      'callDirection': callDirection,
-      'objectType': objectType,
-      'userId': sfUserId,
-    });
-
+  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String status, {String objectType = ''}) async {
     await http.get(
-      Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ callDirection +"/"+ objectType +"/"+ sfUserId,), 
+      Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ status +"/"+ objectType +"/"+ sfUserId,), 
     ); 
   }
 
@@ -441,7 +432,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                                   _existContact(username, destination);
                                   await Future.delayed(const Duration(seconds: 3));
                                   sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
-                                    _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound', objectType: attributeType);
+                                    _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound', objectType: attributeType);
                                   }));
                                 }
                               }, 
@@ -546,7 +537,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                         child: IconButton(
                           onPressed: () {
                             sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
-                              _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound', objectType: attributeType);
+                              _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'reject', objectType: attributeType);
                             }));
 
                             _performHangup();
@@ -791,21 +782,20 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
       case CallStateEnum.FAILED:
         _clearStreams(); 
         setState(() {
+          entity = '';
           destination = '';
           inProgress = false;
           _answered = false;
-          _muteCall = false;  
+          _muteCall = false;
           _holdCall = false;
         });
         _stopWatchTimer.onResetTimer();
-        _player.stop(); 
+        _player.stop();
         _localStream?.getTracks().forEach((track) {
           track.stop();
         });
-        await Future.delayed(const Duration(seconds: 5));
-        prettyLog('Faileedd');
-        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'misscall', objectType: entity);
-        setState(() { entity = ''; });
+        // await Future.delayed(const Duration(seconds: 8));
+        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'misscall');
         break;
       default:
     }
