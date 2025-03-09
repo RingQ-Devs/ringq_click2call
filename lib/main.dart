@@ -3,9 +3,6 @@
 import 'package:scaled_app/scaled_app.dart';
 import 'dialer.dart';
 import 'package:flutter/material.dart';
-import 'assets.dart';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 void main() {
   runAppScaled(const MyApp(), scaleFactor: (deviceSize) {

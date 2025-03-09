@@ -5,7 +5,8 @@ import 'package:avatar_glow/avatar_glow.dart';
 import 'package:carbon_icons/carbon_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart'; 
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:js/js.dart'; 
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'assets.dart'; 
@@ -16,7 +17,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class Dialer extends StatefulWidget {
-  const Dialer({ super.key,  }); 
+  const Dialer({ super.key,  });
   @override
   State<Dialer> createState() => _DialerState();
 }
@@ -34,6 +35,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   bool _muteCall = false;
   bool _answered = false;
   bool _declined = false;
+  String sfUserId = '';
   final AudioPlayer _player = AudioPlayer();
   final SIPUAHelper sipUAHelper = SIPUAHelper();
   final StopWatchTimer _stopWatchTimer = StopWatchTimer(); 
@@ -47,9 +49,10 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   _initializeCallFlow() async {
     var resultUserDetail = await getSfUserDetail();
-    var userDetail = json.decode(resultUserDetail);
+    var userDetail = json.decode(resultUserDetail); 
 
     setState(() {
+      sfUserId = userDetail['Id'];
       extentionNo = userDetail['SIP_Extension__c'];
       username = userDetail['SIP_Username__c'];
       password = userDetail['SIP_Password__c'];
@@ -76,14 +79,24 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
     CallListener.initialize();
     CallListener.onNewCall.listen((payload) async {
       var res = json.decode(payload);
+      prettyLog(res);
+      
       sfNavigateRecord(res['objectType'], res['number']);
-      setState(() => destination = res['number']); 
-       _performCall(context, true);
-       sfToggleSoftphonePanelJS(true);
-    }); 
+      setState(() {
+        destination = res['number'];
+        entity = res['objectType'];
+        sfUserId = res['Id'];
+      });
+      _performCall(context, true);
+
+      await Future.delayed(const Duration(seconds: 1));
+
+      _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound', objectType: entity);
+      sfToggleSoftphonePanelJS(true);
+    });
   }
 
-  _getSearchOrder(hostServer) async { 
+  _getSearchOrder(hostServer) async {
     try {
       final response = await http.post(Uri.parse('https://$hostServer:8443/register/calllog'), 
         body: {'dialer_name': "$username@$extentionNo"},
@@ -96,8 +109,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
             prioritySfSearchOrder = res['content']['priority'];
             prioritySfForm = res['content']['form'];
           });
-
-          prettyLog(res['content']);
         }
       } else {
         print('Failed to send POST request. Status code: ${response.statusCode}');
@@ -119,45 +130,43 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   _performAccept() async {
     debugPrint("<!-- THIS IS ACCEPT");
+    await _existContact(username, callDirections!.remote_identity!);
+    sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
+      _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'answer', objectType: attributeType);
+    }));
     MediaStream mediaStream;
     final mediaConstraints = <String, dynamic>{'audio': true, 'video': false};
     mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
     if (callDirections != null) {
-      sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''));
       callDirections?.answer(sipUAHelper.buildCallOptions(!false), mediaStream: mediaStream);
-      _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'inbound');
-      prettyLog({
-        'prioritySfForm': prioritySfForm
-      }); 
     }
     _player.stop();
   }
 
-  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String callDirection) async { 
-    http.Response response;
+  _registerCallGet(String sipUsername, String callerNumber, String callerDestination, String status, {String objectType = ''}) async {
+    await http.get(
+      Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ status +"/"+ objectType +"/"+ sfUserId,), 
+    ); 
+  }
+
+  _existContact(String username, String callerNumber) async {
     try {
-      // String trimmedQueueNumber = callerDestination.replaceAll("(", "").replaceAll(")", "");
-      response = await http.get(
-        Uri.parse("https://$ringqServer:8443/register/calllog/1/"+ sipUsername + "/"+ callerNumber +"/"+ callerDestination +"/"+ callDirection), 
+      final response = await http.get(
+        Uri.parse("https://$ringqServer:8443/register/calllog/2/"+ username + "/"+ callerNumber), 
       );
       if (response.statusCode == 200) {
-        Map content = json.decode(response.body);
-        prettyLog({
-          "username": sipUsername,
-          "number": callerNumber,
-          "trimmedQueueNumber": callerDestination
-        });
-
-        prettyLog(content);
+        var res = json.decode(response.body);
+        prettyLog(res);
+        return '';
       } else {
-        prettyLog({
-          'error'
-        });
+        print('Failed to send POST request. Status code: ${response.statusCode}');
+        return '';
       }
     } catch (e) {
       prettyLog({
-        '_registerCallGet error:': e
+        '_existContact error:': e
       });
+      return '';
     }
   }
 
@@ -417,9 +426,14 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                           child: CircleAvatar(
                             backgroundColor: primaryColor2, 
                             child: IconButton(
-                              onPressed: () {
+                              onPressed: () async {
                                 if (destination.isNotEmpty) {
                                   _performCall(context, true);
+                                  _existContact(username, destination);
+                                  await Future.delayed(const Duration(seconds: 3));
+                                  sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
+                                    _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound', objectType: attributeType);
+                                  }));
                                 }
                               }, 
                               color: primaryColor,
@@ -521,7 +535,13 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                         backgroundColor: redColor,
                         radius: headerSize * 1.8,
                         child: IconButton(
-                          onPressed: _performHangup,
+                          onPressed: () {
+                            sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
+                              _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'reject', objectType: attributeType);
+                            }));
+
+                            _performHangup();
+                          },
                           iconSize: headerSize * 1.8,
                           color: redColor,
                           icon: Icon(
@@ -666,11 +686,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   @override
   void callStateChanged(Call call, CallState callState) async {
-    prettyLog({
-      'file': 'dialer.dart',
-      'callState.state': callState.state.toString()
-    });
-
     if (callState.state == CallStateEnum.HOLD || callState.state == CallStateEnum.UNHOLD) {
       _holdCall = callState.state == CallStateEnum.HOLD;
       setState(() {});
@@ -737,8 +752,7 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
         setState(() => _answered = true);
         _stopWatchTimer.onResetTimer();
         _stopWatchTimer.onStartTimer();
-        _player.stop(); 
-        _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound');
+        _player.stop();
         break;
       case CallStateEnum.CONFIRMED:
         break;
@@ -768,17 +782,19 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
       case CallStateEnum.FAILED:
         _clearStreams(); 
         setState(() {
+          entity = '';
           destination = '';
           inProgress = false;
           _answered = false;
-          _muteCall = false;  
+          _muteCall = false;
           _holdCall = false;
         });
         _stopWatchTimer.onResetTimer();
-        _player.stop(); 
+        _player.stop();
         _localStream?.getTracks().forEach((track) {
           track.stop();
         });
+        // await Future.delayed(const Duration(seconds: 8));
         _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'misscall');
         break;
       default:
@@ -787,12 +803,6 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
 
   @override
   void registrationStateChanged(RegistrationState state) async {
-    prettyLog({
-      'file': 'dialer.dart',
-      'method': 'registrationStateChanged',
-      'state': state.state.toString(), 
-    });
-
     _player.play(
       UrlSource('https://$ringqServer:8443/audio/ringtone2.mp3'), 
       mode: PlayerMode.lowLatency,
@@ -805,22 +815,10 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
   }
 
   @override
-  void transportStateChanged(TransportState state) {
-    prettyLog({
-      'file': 'dialer.dart',
-      'method': 'transportStateChanged',
-      'state': state.toString()
-    });
-  }
+  void transportStateChanged(TransportState state) {}
 
   @override
-  void onNewReinvite(ReInvite event) {
-    prettyLog({
-      'file': 'dialer.dart',
-      'method': 'onNewReinvite',
-      'event': event.toString()
-    });
-  }
+  void onNewReinvite(ReInvite event) {}
 
   void _disposeRenderers() {
     if (_localRenderer != null) {
