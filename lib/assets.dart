@@ -17,12 +17,12 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:elegant_notification/elegant_notification.dart';
 import 'package:js/js.dart';
 
-@JS()external void sfInvokeDialerJS(String direction, String phoneNumber, Function callback);
 @JS()external void sfToggleSoftphonePanelJS(bool hidden); 
 @JS()external void sfRunApexGetUserDetailJS(Function callback);
 @JS()external void sfStartCallListener(Function callback);
-@JS()external void sfSearchRecordJS(String callerNumber, String searchOrder, String formApiName, Function callback);
-@JS()external void sfNavigateRecord(String navigatePage, String callerNumber);  
+@JS()external void sfSearchRecordJS(String callerNumber, String searchOrder, String formApiName, Function callback, bool multRecord);
+@JS()external void sfNavigateRecord(String navigatePage, String callerNumber); 
+@JS()external dynamic sfGetTotalFoundedRecordJS(String phoneNumber);
 
 getSfUserDetail() {
   final completer = Completer<dynamic>();
@@ -34,14 +34,9 @@ getSfUserDetail() {
   return completer.future;
 }
 
-sfInvokeDialer(String number, String phoneNumber) {
-  final completer = Completer<dynamic>();
-
-  sfInvokeDialerJS(number, phoneNumber, allowInterop((result) {
-    completer.complete(result);
-  }));
-
-  return completer.future;
+Future<int> getTotalFoundedRecord(String phoneNumber) async {
+  final result = await promiseToFuture(sfGetTotalFoundedRecordJS(phoneNumber));
+  return result as int;
 }
 
 class CallListener { 
