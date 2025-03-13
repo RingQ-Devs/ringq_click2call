@@ -20,8 +20,8 @@ import 'package:js/js.dart';
 @JS()external void sfToggleSoftphonePanelJS(bool hidden); 
 @JS()external void sfRunApexGetUserDetailJS(Function callback);
 @JS()external void sfStartCallListener(Function callback);
-@JS()external void sfSearchRecordJS(String callerNumber, String searchOrder, String formApiName, Function callback, bool multRecord);
-@JS()external void sfNavigateRecord(String navigatePage, String callerNumber); 
+@JS()external void sfSearchRecordJS(String callerNumber, String searchOrder, String formApiName, Function callback, bool multRecord, bool doNothing);
+@JS()external void sfNavigateRecord(String navigatePage, String recordId); 
 @JS()external dynamic sfGetTotalFoundedRecordJS(String phoneNumber);
 
 getSfUserDetail() {

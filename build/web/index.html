@@ -87,7 +87,7 @@
       });
     } 
 
-    function sfSearchRecordJS(callerNumber, searchDefaultOrder, defaultPopupFormAPIName, callback = null, multRecord = false) { 
+    function sfSearchRecordJS(callerNumber, searchDefaultOrder, defaultPopupFormAPIName, callback = null, multRecord = false, doNothing = false) { 
       let objectType = '';
       sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
         let found = false;
@@ -101,9 +101,9 @@
           .split('/')
           .map(item => removePlural(item.trim()));
     
-          async function searchNext(index)  {
-          if (index >= searchOrder.length || found) {
-            if (!found) {
+        async function searchNext(index) {
+          if (index >= searchOrder.length || found) { 
+            if (!found && !doNothing) {
               await globalSearch(callerNumber);
               setTimeout(function() {
                 sfPopupFormJS(defaultPopupFormAPIName, function(apiName) {
@@ -117,13 +117,13 @@
                   }
                 });
               }, 5000)
-            }
+            } 
             if (callback) callback(objectType);
             return;
           }
     
           const currentSearch = searchOrder[index];
-    
+
           let searchMethodName = '';
           if (currentSearch === 'Contact') {
             searchMethodName = 'findContactDetail';
@@ -132,17 +132,19 @@
           } else if (currentSearch === 'Account') {
             searchMethodName = 'findAccountDetail';
           }
-    
+
           sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, async (data) => {
             const result = JSON.parse(data);
             if (result && Object.keys(result).length !== 0) {
-              !multRecord
-                ? sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`)
-                : await globalSearch(callerNumber);
+              if (!doNothing) {
+                !multRecord
+                  ? sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`)
+                  : await globalSearch(callerNumber);
+              }
               objectType = result.attributes.type;
               found = true;
             }
-    
+
             if (!found) {
               searchNext(index + 1);
             } else {
@@ -150,7 +152,7 @@
             }
           });
         }
-    
+
         searchNext(0);
       });
     }
@@ -161,23 +163,9 @@
       });
     };
 
-    function sfNavigateRecord(navigatePage, callerNumber) {
-      let searchMethodName = '';
-      if (navigatePage === 'Contact') {
-        searchMethodName = 'findContactDetail';
-      } else if (navigatePage === 'Lead') {
-        searchMethodName = 'findLeadsDetail';
-      } else if (navigatePage === 'Account') {
-        searchMethodName = 'findAccountDetail';
-      }
-
-      sfRunApexJS('getSalesforceDomainUrl', '', (domain) => {
-        sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, (data) => {
-          const result = JSON.parse(data);
-          if (result && Object.keys(result).length !== 0) {
-            sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`);
-          }
-        });
+    function sfNavigateRecord(navigatePage, recordId) { 
+      sfRunApexJS('getSalesforceDomainUrl', '', (domain) => { 
+          sfNavigateJS(`${domain}/lightning/r/${navigatePage}/${recordId}/view`); 
       });
     }
 
@@ -195,8 +183,10 @@
       }
     };
 
-    var listener = function(payload) {};
- 
+    var listener = function(payload) {
+      console.log('outbound: ', payload)
+    };
+
     sforce.opencti.getAppViewInfo({ callback: callback });
     sforce.opencti.enableClickToDial({ callback: callback });
     sforce.opencti.onClickToDial({ listener: listener });
