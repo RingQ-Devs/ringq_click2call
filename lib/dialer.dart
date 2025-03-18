@@ -439,12 +439,12 @@ class _DialerState extends State<Dialer> implements SipUaHelperListener {
                                 if (destination.isNotEmpty) {
                                   _performCall(context, true);
                                   _existContact(username, destination);
-                                  await Future.delayed(const Duration(seconds: 3));
+                                  await Future.delayed(const Duration(seconds: 3)); 
                                   sfSearchRecordJS(callDirections!.remote_identity!, prioritySfSearchOrder, prioritySfForm.replaceAll(RegExp(r's$'), ''), allowInterop((String attributeType) {
                                     _registerCallGet(username, callDirections!.remote_identity!, extentionNo, 'outbound', objectType: attributeType);
-                                  }), false, false);
+                                  }), true, false);
                                 }
-                              }, 
+                              },
                               color: primaryColor,
                               icon: const Icon(
                                 CarbonIcons.phone_filled, 

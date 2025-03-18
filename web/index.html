@@ -96,7 +96,7 @@
           const singularMap = { Contacts: "Contact", Leads: "Lead", Accounts: "Account" };
           return singularMap[item] || item;
         };
-    
+
         const searchOrder = searchDefaultOrder
           .split('/')
           .map(item => removePlural(item.trim()));
