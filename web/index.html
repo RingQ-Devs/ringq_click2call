@@ -96,24 +96,27 @@
           const singularMap = { Contacts: "Contact", Leads: "Lead", Accounts: "Account" };
           return singularMap[item] || item;
         };
-
+    
         const searchOrder = searchDefaultOrder
           .split('/')
           .map(item => removePlural(item.trim()));
     
         async function searchNext(index) {
           if (index >= searchOrder.length || found) { 
-            if (!found && !doNothing) { 
-              sfPopupFormJS(defaultPopupFormAPIName, function(apiName) {
-                switch (apiName) {
-                  case 'Contact':
-                    return { Phone: callerNumber, FirstName: '', LastName: '', Email: '' };
-                  case 'Lead':
-                    return { Phone: callerNumber };
-                  default:
-                    return { Phone: callerNumber };
-                }
-              });
+            if (!found && !doNothing) {
+              await globalSearch(callerNumber);
+              setTimeout(function() {
+                sfPopupFormJS(defaultPopupFormAPIName, function(apiName) {
+                  switch (apiName) {
+                    case 'Contact':
+                      return { Phone: callerNumber, FirstName: '', LastName: '', Email: '' };
+                    case 'Lead':
+                      return { Phone: callerNumber };
+                    default:
+                      return { Phone: callerNumber };
+                  }
+                });
+              }, 5000)
             } 
             if (callback) callback(objectType);
             return;
@@ -132,8 +135,7 @@
 
           sfRunApexJS(searchMethodName, `phoneNumber=${callerNumber}`, async (data) => {
             const result = JSON.parse(data);
-            
-            if (result && result.Id) { 
+            if (result && Object.keys(result).length !== 0) {
               if (!doNothing) {
                 !multRecord
                   ? sfNavigateJS(`${domain}/lightning/r/${result.attributes.type}/${result.Id}/view`)
@@ -141,12 +143,13 @@
               }
               objectType = result.attributes.type;
               found = true;
-            } else {
-              searchNext(index + 1);
-              return;
             }
 
-            if (callback) callback(objectType);
+            if (!found) {
+              searchNext(index + 1);
+            } else {
+              if (callback) callback(objectType);
+            }
           });
         }
 
