@@ -1,4 +1,4 @@
-# click2talk
+# click2Call
 
 A new Flutter project.
 
